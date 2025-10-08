@@ -1,0 +1,5 @@
+nexus:
+    address: http://nexus.example.com
+repository: testrepo
+user: testuser
+password: testpass

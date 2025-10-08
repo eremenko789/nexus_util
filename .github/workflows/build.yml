@@ -1,0 +1,221 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ 'main' ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ '*' ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+    
+    - name: Install dependencies
+      run: |
+        echo "Installing Go dependencies..."
+        go mod download
+        go mod tidy
+    
+    - name: Run tests
+      run: |
+        echo "Running tests..."
+        go test -cover -v ./...
+    
+    - name: Run linter
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+        - goos: linux
+          goarch: amd64
+        - goos: linux
+          goarch: arm64
+        - goos: linux
+          goarch: arm
+          goarm: 7
+        - goos: windows
+          goarch: amd64
+        - goos: windows
+          goarch: 386
+        - goos: darwin
+          goarch: amd64
+        - goos: darwin
+          goarch: arm64
+        - goos: freebsd
+          goarch: amd64
+        - goos: openbsd
+          goarch: amd64
+        - goos: netbsd
+          goarch: amd64
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+    
+    - name: Install dependencies
+      run: |
+        echo "Installing Go dependencies..."
+        go mod download
+        go mod tidy
+    
+    - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        GOARM: ${{ matrix.goarm }}
+      run: |
+        echo "Starting build for ${{ matrix.goos }}/${{ matrix.goarch }}..."
+        
+        # Get version info safely
+        if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
+          VERSION=$(git describe --tags --exact-match HEAD)
+        else
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+        fi
+        
+        BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+        GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        
+        OUTPUT_NAME=nexus-util
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          OUTPUT_NAME=nexus-util.exe
+        fi
+        
+        echo "Build configuration:"
+        echo "  Version: $VERSION"
+        echo "  Build time: $BUILD_TIME"
+        echo "  Git commit: $GIT_COMMIT"
+        echo "  Target: ${{ matrix.goos }}/${{ matrix.goarch }}"
+        echo "  Output: $OUTPUT_NAME"
+        
+        # Build the binary
+        go build -ldflags "-X main.version=$VERSION -X main.build=$GIT_COMMIT" \
+          -o $OUTPUT_NAME .
+        
+        # Verify the binary was created
+        if [ -f "$OUTPUT_NAME" ]; then
+          echo "✅ Binary created successfully: $OUTPUT_NAME"
+          ls -la $OUTPUT_NAME
+        else
+          echo "❌ Binary creation failed!"
+          exit 1
+        fi
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nexus-util-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goarm }}
+        path: nexus-util*
+        retention-days: 7
+
+  verify-build:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+    
+    - name: Verify all binaries were built
+      run: |
+        echo "Verifying all binaries were built successfully..."
+        
+        # Expected platforms and architectures
+        expected_platforms=(
+          "linux-amd64"
+          "linux-arm64" 
+          "linux-arm7"
+          "windows-amd64"
+          "windows-386"
+          "darwin-amd64"
+          "darwin-arm64"
+          "freebsd-amd64"
+          "openbsd-amd64"
+          "netbsd-amd64"
+        )
+        
+        # Check if all expected artifacts exist
+        missing_artifacts=()
+        for platform in "${expected_platforms[@]}"; do
+          if [ ! -d "nexus-util-$platform" ]; then
+            missing_artifacts+=("$platform")
+          else
+            echo "✅ Found artifact for $platform"
+            ls -la "nexus-util-$platform/"
+          fi
+        done
+        
+        # Report results
+        if [ ${#missing_artifacts[@]} -eq 0 ]; then
+          echo "🎉 All binaries built successfully!"
+          echo "Total artifacts: $(ls -d nexus-util-* | wc -l)"
+        else
+          echo "❌ Missing artifacts for: ${missing_artifacts[*]}"
+          exit 1
+        fi
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build, verify-build]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+    
+    - name: Create release packages
+      run: |
+        mkdir -p release
+        for artifact in nexus-util-*; do
+          if [ -d "$artifact" ]; then
+            OS_ARCH=$(echo $artifact | sed 's/nexus-util-//')
+            PACKAGE_NAME=nexus-util-${GITHUB_REF_NAME}-$OS_ARCH
+            mkdir -p release/$PACKAGE_NAME
+            cp $artifact/nexus-util* release/$PACKAGE_NAME/
+            cp README.md release/$PACKAGE_NAME/ 2>/dev/null || echo "README.md not found, skipping"
+            cd release
+            tar -czf $PACKAGE_NAME.tar.gz $PACKAGE_NAME/
+            cd ..
+            rm -rf release/$PACKAGE_NAME
+          fi
+        done
+    
+    - name: Create checksums
+      run: |
+        cd release
+        sha256sum *.tar.gz > checksums.txt
+        echo "Created checksums:"
+        cat checksums.txt
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/*.tar.gz
+          release/checksums.txt
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
