@@ -81,11 +81,12 @@ func (c *NexusClient) GetFilesInDirectory(dirPath string) ([]string, error) {
 	for {
 		// Build search URL
 		searchURL := fmt.Sprintf("%s/service/rest/v1/search/assets?repository=%s", c.BaseURL, c.Repository)
-		
+
 		if dirPath != "" {
+			dirPath = strings.TrimSuffix(dirPath, "/")
 			// URL encode the directory path
-			encodedPath := url.QueryEscape(dirPath + "/*")
-			searchURL += "&name=" + encodedPath
+			encodedPath := url.QueryEscape(dirPath + "/")
+			searchURL += "&name=" + encodedPath + "*"
 		}
 
 		if continuationToken != "" {
@@ -130,7 +131,7 @@ func (c *NexusClient) GetFilesInDirectory(dirPath string) ([]string, error) {
 // DeleteFile deletes a file from Nexus repository
 func (c *NexusClient) DeleteFile(filePath string) error {
 	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, c.Repository, filePath)
-	
+
 	if c.DryRun {
 		c.log("File '%s' planned for deletion from %s", filePath, fileURL)
 		return nil
@@ -189,13 +190,15 @@ func (c *NexusClient) DeleteDirectory(dirPath string) error {
 // DownloadFile downloads a file from Nexus repository
 func (c *NexusClient) DownloadFile(filePath, destPath string) error {
 	// Create destination directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+	if c.DryRun {
+		c.log("Directory '%s' planned for creation", filepath.Dir(destPath))
+	} else if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
 	// Build download URL
 	encodedPath := url.QueryEscape(filePath)
-	downloadURL := fmt.Sprintf("%s/service/rest/v1/search/assets/download?repository=%s&name=%s", 
+	downloadURL := fmt.Sprintf("%s/service/rest/v1/search/assets/download?repository=%s&name=%s",
 		c.BaseURL, c.Repository, encodedPath)
 
 	c.log("REST API: %s", downloadURL)

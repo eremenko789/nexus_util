@@ -11,15 +11,9 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Nexus      NexusConfig `yaml:"nexus" mapstructure:"nexus"`
-	Repository string      `yaml:"repository" mapstructure:"repository"`
-	User       string      `yaml:"user" mapstructure:"user"`
-	Password   string      `yaml:"password" mapstructure:"password"`
-}
-
-// NexusConfig represents Nexus server configuration
-type NexusConfig struct {
-	Address string `yaml:"address" mapstructure:"address"`
+	NexusAddress string `yaml:"nexusAddress" mapstructure:"nexusAddress"`
+	User         string `yaml:"user" mapstructure:"user"`
+	Password     string `yaml:"password" mapstructure:"password"`
 }
 
 // DefaultConfigPath returns the default configuration file path
@@ -44,8 +38,7 @@ func LoadConfig(configPath string, cmdFlags map[string]interface{}) (*Config, er
 	viper.SetConfigType("yaml")
 
 	// Set default values
-	viper.SetDefault("nexus.address", "")
-	viper.SetDefault("repository", "")
+	viper.SetDefault("nexusAddress", "")
 	viper.SetDefault("user", "")
 	viper.SetDefault("password", "")
 
@@ -71,6 +64,11 @@ func LoadConfig(configPath string, cmdFlags map[string]interface{}) (*Config, er
 	}
 
 	return &config, nil
+}
+
+// LoadConfigWithFlags loads configuration with command line flag overrides
+func LoadConfigWithFlags(configPath string, flags map[string]interface{}) (*Config, error) {
+	return LoadConfig(configPath, flags)
 }
 
 // SaveConfig saves configuration to file
@@ -101,23 +99,15 @@ func SaveConfig(config *Config, configPath string) error {
 
 // ValidateConfig validates the configuration
 func (c *Config) Validate() error {
-	if c.Nexus.Address == "" {
+	if c.NexusAddress == "" {
 		return fmt.Errorf("nexus address is required")
-	}
-	if c.Repository == "" {
-		return fmt.Errorf("repository name is required")
 	}
 	return nil
 }
 
 // GetNexusAddress returns the Nexus address
 func (c *Config) GetNexusAddress() string {
-	return c.Nexus.Address
-}
-
-// GetRepository returns the repository name
-func (c *Config) GetRepository() string {
-	return c.Repository
+	return c.NexusAddress
 }
 
 // GetUser returns the username

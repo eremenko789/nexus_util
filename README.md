@@ -56,13 +56,13 @@ password: mypassword
 **Initialize configuration:**
 ```bash
 # Create default config file
-nexus-util init --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+nexus-util init --address http://nexus.example.com --user myuser --password mypass
 
 # Create custom config file
-nexus-util init --config ./my-config.yaml --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+nexus-util init --config ./my-config.yaml --address http://nexus.example.com --user myuser --password mypass
 
 # Initialize without password (will be prompted)
-nexus-util init --address http://nexus.example.com --repository myrepo --user myuser
+nexus-util init --address http://nexus.example.com --user myuser
 ```
 
 Command line flags always override configuration file values.

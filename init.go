@@ -17,33 +17,30 @@ to avoid specifying connection details on every command.
 
 Examples:
   # Initialize with default config file location (~/.nexus-util.yaml)
-  nexus-util init --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+  nexus-util init --address http://nexus.example.com --user myuser --password mypass
 
   # Initialize with custom config file location
-  nexus-util init --config ./my-config.yaml --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+  nexus-util init --config ./my-config.yaml --address http://nexus.example.com --user myuser --password mypass
 
   # Initialize without password (will be prompted)
-  nexus-util init --address http://nexus.example.com --repository myrepo --user myuser`,
+  nexus-util init --address http://nexus.example.com --user myuser`,
 	RunE: runInit,
 }
 
 func init() {
 	initCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")
-	initCmd.Flags().StringP("repository", "r", "", "Nexus OSS raw repository name (required)")
 	initCmd.Flags().StringP("user", "u", "", "User authentication login (required)")
 	initCmd.Flags().StringP("password", "p", "", "User authentication password")
 	initCmd.Flags().StringP("config", "c", "", "Path to configuration file (default: ~/.nexus-util.yaml)")
 
 	// Mark required flags
 	initCmd.MarkFlagRequired("address")
-	initCmd.MarkFlagRequired("repository")
 	initCmd.MarkFlagRequired("user")
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
 	// Get flags
 	address, _ := cmd.Flags().GetString("address")
-	repository, _ := cmd.Flags().GetString("repository")
 	user, _ := cmd.Flags().GetString("user")
 	password, _ := cmd.Flags().GetString("password")
 	configPath, _ := cmd.Flags().GetString("config")
@@ -61,12 +58,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Create config
 	config := &Config{
-		Nexus: NexusConfig{
-			Address: address,
-		},
-		Repository: repository,
-		User:       user,
-		Password:   password,
+		NexusAddress: address,
+		User:         user,
+		Password:     password,
 	}
 
 	// Validate config
