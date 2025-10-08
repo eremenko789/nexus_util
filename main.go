@@ -54,3 +54,16 @@ Configuration:
 		os.Exit(1)
 	}
 }
+
+func init() {
+	// Push command flags
+	pushCmd.Flags().StringP("destination", "d", "", "Destination path in Nexus repository")
+	pushCmd.Flags().Bool("relative", false, "Use relative paths when uploading directories")
+	pushCmd.MarkFlagRequired("repository")
+
+	// Pull command flags
+	pullCmd.Flags().StringP("destination", "d", "", "Local destination path (required)")
+	pullCmd.Flags().String("root", "", "Root path in Nexus repository")
+	pullCmd.Flags().BoolP("saveStructure", "s", false, "Save directory structure in destination path")
+	pullCmd.MarkFlagRequired("repository")
+}
