@@ -9,6 +9,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// loadConfigWithFlags loads configuration with command line flag overrides
+func loadConfigWithFlags(configPath string, flags map[string]interface{}) (*Config, error) {
+	return LoadConfig(configPath, flags)
+}
+
 var pushCmd = &cobra.Command{
 	Use:   "push [flags] <path>...",
 	Short: "Upload files or directories to Nexus repository",
@@ -86,6 +91,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 	repository, _ := cmd.Flags().GetString("repository")
 	username, _ := cmd.Flags().GetString("user")
 	password, _ := cmd.Flags().GetString("password")
+	configPath, _ := cmd.Flags().GetString("config")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	dryRun, _ := cmd.Flags().GetBool("dry")
 
@@ -93,13 +99,24 @@ func runPush(cmd *cobra.Command, args []string) error {
 	destination, _ := cmd.Flags().GetString("destination")
 	relative, _ := cmd.Flags().GetBool("relative")
 
-	// Validate required flags
-	if address == "" || repository == "" {
-		return fmt.Errorf("address and repository are required")
+	// Load configuration
+	config, err := loadConfigWithFlags(configPath, map[string]interface{}{
+		"nexus.address": address,
+		"repository":    repository,
+		"user":          username,
+		"password":      password,
+	})
+	if err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
+	// Validate configuration
+	if err := config.Validate(); err != nil {
+		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	// Create Nexus client
-	client := NewNexusClient(address, repository, username, password, quiet, dryRun)
+	client := NewNexusClient(config.GetNexusAddress(), config.GetRepository(), config.GetUser(), config.GetPassword(), quiet, dryRun)
 
 	// Process each path
 	for _, path := range args {
@@ -149,7 +166,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		linkDest = "."
 	}
 	linkDest = strings.ReplaceAll(linkDest, "/", "%2F")
-	linkURL := fmt.Sprintf("%s/#browse/browse:%s:%s", address, repository, linkDest)
+	linkURL := fmt.Sprintf("%s/#browse/browse:%s:%s", config.GetNexusAddress(), config.GetRepository(), linkDest)
 	fmt.Println(linkURL)
 
 	if !quiet {
@@ -165,6 +182,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	repository, _ := cmd.Flags().GetString("repository")
 	username, _ := cmd.Flags().GetString("user")
 	password, _ := cmd.Flags().GetString("password")
+	configPath, _ := cmd.Flags().GetString("config")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	dryRun, _ := cmd.Flags().GetBool("dry")
 
@@ -172,9 +190,20 @@ func runPull(cmd *cobra.Command, args []string) error {
 	destination, _ := cmd.Flags().GetString("destination")
 	root, _ := cmd.Flags().GetString("root")
 
-	// Validate required flags
-	if address == "" || repository == "" {
-		return fmt.Errorf("address and repository are required")
+	// Load configuration
+	config, err := loadConfigWithFlags(configPath, map[string]interface{}{
+		"nexus.address": address,
+		"repository":    repository,
+		"user":          username,
+		"password":      password,
+	})
+	if err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
+	// Validate configuration
+	if err := config.Validate(); err != nil {
+		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	// Validate destination directory
@@ -190,7 +219,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	destination = strings.TrimSuffix(destination, "\\")
 
 	// Create Nexus client
-	client := NewNexusClient(address, repository, username, password, quiet, dryRun)
+	client := NewNexusClient(config.GetNexusAddress(), config.GetRepository(), config.GetUser(), config.GetPassword(), quiet, dryRun)
 
 	// Process each source
 	for _, source := range args {
@@ -227,16 +256,28 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	repository, _ := cmd.Flags().GetString("repository")
 	username, _ := cmd.Flags().GetString("user")
 	password, _ := cmd.Flags().GetString("password")
+	configPath, _ := cmd.Flags().GetString("config")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	dryRun, _ := cmd.Flags().GetBool("dry")
 
-	// Validate required flags
-	if address == "" || repository == "" {
-		return fmt.Errorf("address and repository are required")
+	// Load configuration
+	config, err := loadConfigWithFlags(configPath, map[string]interface{}{
+		"nexus.address": address,
+		"repository":    repository,
+		"user":          username,
+		"password":      password,
+	})
+	if err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
+	// Validate configuration
+	if err := config.Validate(); err != nil {
+		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	// Create Nexus client
-	client := NewNexusClient(address, repository, username, password, quiet, dryRun)
+	client := NewNexusClient(config.GetNexusAddress(), config.GetRepository(), config.GetUser(), config.GetPassword(), quiet, dryRun)
 
 	// Process each path
 	for _, path := range args {
@@ -259,7 +300,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print browse URL
-	linkURL := fmt.Sprintf("%s/#browse/browse:%s", address, repository)
+	linkURL := fmt.Sprintf("%s/#browse/browse:%s", config.GetNexusAddress(), config.GetRepository())
 	fmt.Println(linkURL)
 
 	if !quiet {

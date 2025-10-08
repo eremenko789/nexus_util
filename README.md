@@ -7,6 +7,7 @@ A unified command-line tool for managing files and directories in Nexus OSS Raw 
 - **Push**: Upload files and directories to Nexus repository
 - **Pull**: Download files and directories from Nexus repository  
 - **Delete**: Remove files and directories from Nexus repository
+- **Configuration file**: Store connection details in YAML config file
 - **Cross-platform**: Builds for Linux, Windows, macOS, FreeBSD, OpenBSD, NetBSD
 - **Multiple architectures**: AMD64, ARM64, ARM, 386
 - **Dry run mode**: Preview operations without making changes
@@ -31,12 +32,40 @@ make build
 
 ### Global Flags
 
-- `-a, --address`: Nexus OSS host address (required)
-- `-r, --repository`: Nexus OSS raw repository name (required)
-- `-u, --user`: User authentication login
-- `-p, --password`: User authentication password
+- `-a, --address`: Nexus OSS host address (overrides config file)
+- `-r, --repository`: Nexus OSS raw repository name (overrides config file)
+- `-u, --user`: User authentication login (overrides config file)
+- `-p, --password`: User authentication password (overrides config file)
+- `-c, --config`: Path to configuration file (default: ~/.nexus-util.yaml)
 - `-q, --quiet`: Quiet mode - minimal output
 - `--dry`: Dry run - show what would be done without actually doing it
+
+### Configuration
+
+The tool supports configuration via a YAML file to avoid specifying connection details on every command. By default, it looks for `~/.nexus-util.yaml`, but you can specify a custom path with `--config`.
+
+**Example configuration file:**
+```yaml
+nexus:
+  address: http://nexus.example.com
+repository: myrepo
+user: myuser
+password: mypassword
+```
+
+**Initialize configuration:**
+```bash
+# Create default config file
+nexus-util init --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+
+# Create custom config file
+nexus-util init --config ./my-config.yaml --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+
+# Initialize without password (will be prompted)
+nexus-util init --address http://nexus.example.com --repository myrepo --user myuser
+```
+
+Command line flags always override configuration file values.
 
 ### Push Command
 
@@ -100,36 +129,87 @@ nexus-util delete -a http://nexus.example.com -r myrepo -u user -p pass dir/
 nexus-util delete --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt
 ```
 
+### Init Command
+
+Initialize configuration file with default values.
+
+```bash
+# Initialize with default config file location (~/.nexus-util.yaml)
+nexus-util init --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+
+# Initialize with custom config file location
+nexus-util init --config ./my-config.yaml --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+
+# Initialize without password (will be prompted)
+nexus-util init --address http://nexus.example.com --repository myrepo --user myuser
+```
+
+**Init-specific flags:**
+- `-a, --address`: Nexus OSS host address (required)
+- `-r, --repository`: Nexus OSS raw repository name (required)
+- `-u, --user`: User authentication login (required)
+- `-p, --password`: User authentication password
+- `-c, --config`: Path to configuration file (default: ~/.nexus-util.yaml)
+
 ## Examples
+
+### Setup Configuration
+
+```bash
+# Initialize configuration file
+nexus-util init --address http://nexus.example.com --repository releases --user deploy --password secret
+
+# Now you can use commands without specifying connection details
+nexus-util push file.txt
+nexus-util pull -d ./downloads file.txt
+nexus-util delete file.txt
+```
 
 ### Upload a project to Nexus
 
 ```bash
-# Upload entire project directory
-nexus-util push -a http://nexus.example.com -r releases -u deploy -p secret -d myproject/v1.0.0 ./build/
+# Using configuration file
+nexus-util push -d myproject/v1.0.0 ./build/
+
+# Override repository from config
+nexus-util push -r staging -d myproject/v1.0.0 ./build/
 
 # Upload with relative paths (only files, not directory structure)
-nexus-util push -a http://nexus.example.com -r releases -u deploy -p secret --relative ./dist/
+nexus-util push --relative ./dist/
 ```
 
 ### Download a release
 
 ```bash
-# Download specific version
-nexus-util pull -a http://nexus.example.com -r releases -u user -p pass -d ./downloads myproject/v1.0.0/
+# Using configuration file
+nexus-util pull -d ./downloads myproject/v1.0.0/
+
+# Override destination repository
+nexus-util pull -r staging -d ./downloads myproject/v1.0.0/
 
 # Download latest files
-nexus-util pull -a http://nexus.example.com -r releases -u user -p pass -d ./downloads latest/
+nexus-util pull -d ./downloads latest/
 ```
 
 ### Clean up old releases
 
 ```bash
-# Delete old version
-nexus-util delete -a http://nexus.example.com -r releases -u admin -p secret myproject/v0.9.0/
+# Using configuration file
+nexus-util delete myproject/v0.9.0/
+
+# Override user for admin operations
+nexus-util delete -u admin -p adminpass myproject/v0.9.0/
 
 # Dry run to see what would be deleted
-nexus-util delete --dry -a http://nexus.example.com -r releases -u admin -p secret old-files/
+nexus-util delete --dry old-files/
+```
+
+### Using Custom Configuration Files
+
+```bash
+# Use different config for different environments
+nexus-util --config ./prod-config.yaml push file.txt
+nexus-util --config ./staging-config.yaml pull -d ./downloads file.txt
 ```
 
 ## Development
