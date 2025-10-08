@@ -81,7 +81,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		if info.IsDir() {
 			// Upload directory
 			client.log("path '%s' is directory", path)
-			if err := client.UploadDirectory(path, relative); err != nil {
+			if err := client.UploadDirectory(path, relative, destination); err != nil {
 				return fmt.Errorf("failed to upload directory: %w", err)
 			}
 		} else {

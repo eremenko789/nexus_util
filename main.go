@@ -66,4 +66,12 @@ func init() {
 	pullCmd.Flags().String("root", "", "Root path in Nexus repository")
 	pullCmd.Flags().BoolP("saveStructure", "s", false, "Save directory structure in destination path")
 	pullCmd.MarkFlagRequired("repository")
+
+	// Init command flags
+	initCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")
+	initCmd.Flags().StringP("user", "u", "", "User authentication login (required)")
+	initCmd.Flags().StringP("password", "p", "", "User authentication password")
+	initCmd.Flags().StringP("config", "c", "", "Path to configuration file (default: ~/.nexus-util.yaml)")
+	initCmd.MarkFlagRequired("address")
+	initCmd.MarkFlagRequired("user")
 }

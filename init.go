@@ -27,17 +27,6 @@ Examples:
 	RunE: runInit,
 }
 
-func init() {
-	initCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")
-	initCmd.Flags().StringP("user", "u", "", "User authentication login (required)")
-	initCmd.Flags().StringP("password", "p", "", "User authentication password")
-	initCmd.Flags().StringP("config", "c", "", "Path to configuration file (default: ~/.nexus-util.yaml)")
-
-	// Mark required flags
-	initCmd.MarkFlagRequired("address")
-	initCmd.MarkFlagRequired("user")
-}
-
 func runInit(cmd *cobra.Command, args []string) error {
 	// Get flags
 	address, _ := cmd.Flags().GetString("address")

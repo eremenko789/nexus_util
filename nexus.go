@@ -275,8 +275,12 @@ func (c *NexusClient) UploadFile(filePath, destPath string) error {
 }
 
 // UploadDirectory uploads all files in a directory recursively
-func (c *NexusClient) UploadDirectory(dirPath string, relative bool) error {
+func (c *NexusClient) UploadDirectory(dirPath string, relative bool, destination string) error {
 	c.log("Process directory '%s'", dirPath)
+	if destination == "" {
+		c.log("Destination is empty, using default '/'")
+	}
+	c.log("Destination: %s", destination)
 
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -293,13 +297,14 @@ func (c *NexusClient) UploadDirectory(dirPath string, relative bool) error {
 			if err != nil {
 				return fmt.Errorf("failed to get relative path: %w", err)
 			}
-			destPath = relPath
+			destPath = destination + relPath
 		} else {
-			destPath = path
+			destPath = destination + path
 		}
 
 		// Convert to forward slashes for URL
 		destPath = strings.ReplaceAll(destPath, "\\", "/")
+		c.log("DestPath: %s", destPath)
 
 		return c.UploadFile(path, destPath)
 	})
