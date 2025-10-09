@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -90,13 +89,13 @@ func runPull(cmd *cobra.Command, args []string) error {
 		if isDir {
 			// Download directory
 			client.log("source '%s' is directory", source)
-			if err := downloadDirectory(client, source, destination, root, saveStructure); err != nil {
+			if err := client.DownloadDirectoryWithPath(source, destination, root, saveStructure); err != nil {
 				return fmt.Errorf("failed to download directory: %w", err)
 			}
 		} else {
 			// Download file
 			client.log("source '%s' is file", source)
-			if err := downloadFile(client, source, destination, root); err != nil {
+			if err := client.DownloadFileWithPath(source, destination, root); err != nil {
 				return fmt.Errorf("failed to download file: %w", err)
 			}
 		}
@@ -106,78 +105,5 @@ func runPull(cmd *cobra.Command, args []string) error {
 		fmt.Println("Success!")
 	}
 
-	return nil
-}
-
-func downloadFile(client *NexusClient, filePath, destination, root string) error {
-	client.log("Download file %s ...", filePath)
-
-	// Build full path if root is specified
-	var fullPath string
-	if root != "" && !strings.HasPrefix(filePath, root) {
-		fullPath = root + "/" + filePath
-	} else {
-		fullPath = filePath
-	}
-
-	// Determine destination path
-	fileName := filepath.Base(filePath)
-	client.log("File name: %s", fileName)
-	destPath := filepath.Join(destination, fileName)
-	client.log("Destination path: %s", destPath)
-
-	// Download the file
-	return client.DownloadFile(fullPath, destPath)
-}
-
-func downloadDirectory(client *NexusClient, dirPath, destination, root string, saveStructure bool) error {
-	client.log("Download dir %s ...", dirPath)
-
-	// Build full path if root is specified
-	var fullPath string
-	if root != "" && !strings.HasPrefix(dirPath, root) {
-		fullPath = root + "/" + dirPath
-	} else {
-		fullPath = dirPath
-	}
-
-	// Get all files in directory
-	files, err := client.GetFilesInDirectory(fullPath)
-	if err != nil {
-		return fmt.Errorf("failed to get files in directory: %w", err)
-	}
-
-	// Download each file
-	for _, file := range files {
-		client.log("file '%s' searched", file)
-
-		// Calculate relative path
-		var relPath string
-		if root != "" {
-			relPath = strings.TrimPrefix(file, root+"/")
-		} else {
-			relPath = file
-		}
-
-		// Get the filename from the variable 'file', which may contain a relative path
-		fileName := filepath.Base(file)
-		client.log("File name: %s", fileName)
-
-		// Build destination path
-		var destPath string
-		if saveStructure {
-			destPath = filepath.Join(destination, relPath)
-		} else {
-			destPath = filepath.Join(destination, fileName)
-		}
-		client.log("Destination path: %s", destPath)
-
-		// Download the file
-		if err := client.DownloadFile(file, destPath); err != nil {
-			return fmt.Errorf("failed to download file %s: %w", file, err)
-		}
-	}
-
-	client.log("Success dir %s ...", dirPath)
 	return nil
 }

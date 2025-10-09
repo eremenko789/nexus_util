@@ -309,3 +309,78 @@ func (c *NexusClient) UploadDirectory(dirPath string, relative bool, destination
 		return c.UploadFile(path, destPath)
 	})
 }
+
+// DownloadFileWithPath downloads a file from Nexus repository with custom destination path
+func (c *NexusClient) DownloadFileWithPath(filePath, destination, root string) error {
+	c.log("Download file %s ...", filePath)
+
+	// Build full path if root is specified
+	var fullPath string
+	if root != "" && !strings.HasPrefix(filePath, root) {
+		fullPath = root + "/" + filePath
+	} else {
+		fullPath = filePath
+	}
+
+	// Determine destination path
+	fileName := filepath.Base(filePath)
+	c.log("File name: %s", fileName)
+	destPath := filepath.Join(destination, fileName)
+	c.log("Destination path: %s", destPath)
+
+	// Download the file
+	return c.DownloadFile(fullPath, destPath)
+}
+
+// DownloadDirectoryWithPath downloads a directory from Nexus repository with custom destination path
+func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root string, saveStructure bool) error {
+	c.log("Download dir %s ...", dirPath)
+
+	// Build full path if root is specified
+	var fullPath string
+	if root != "" && !strings.HasPrefix(dirPath, root) {
+		fullPath = root + "/" + dirPath
+	} else {
+		fullPath = dirPath
+	}
+
+	// Get all files in directory
+	files, err := c.GetFilesInDirectory(fullPath)
+	if err != nil {
+		return fmt.Errorf("failed to get files in directory: %w", err)
+	}
+
+	// Download each file
+	for _, file := range files {
+		c.log("file '%s' searched", file)
+
+		// Calculate relative path
+		var relPath string
+		if root != "" {
+			relPath = strings.TrimPrefix(file, root+"/")
+		} else {
+			relPath = file
+		}
+
+		// Get the filename from the variable 'file', which may contain a relative path
+		fileName := filepath.Base(file)
+		c.log("File name: %s", fileName)
+
+		// Build destination path
+		var destPath string
+		if saveStructure {
+			destPath = filepath.Join(destination, relPath)
+		} else {
+			destPath = filepath.Join(destination, fileName)
+		}
+		c.log("Destination path: %s", destPath)
+
+		// Download the file
+		if err := c.DownloadFile(file, destPath); err != nil {
+			return fmt.Errorf("failed to download file %s: %w", file, err)
+		}
+	}
+
+	c.log("Success dir %s ...", dirPath)
+	return nil
+}
