@@ -52,7 +52,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create Nexus client
-	client := NewNexusClient(config.GetNexusAddress(), repository, config.GetUser(), config.GetPassword(), quiet, dryRun)
+	client := NewNexusClient(config.GetNexusAddress(), config.GetUser(), config.GetPassword(), quiet, dryRun)
 
 	// Process each path
 	for _, path := range args {
@@ -63,12 +63,12 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 		if isDir {
 			// Delete directory
-			if err := client.DeleteDirectory(path); err != nil {
+			if err := client.DeleteDirectory(repository, path); err != nil {
 				return fmt.Errorf("failed to delete directory: %w", err)
 			}
 		} else {
 			// Delete file
-			if err := client.DeleteFile(path); err != nil {
+			if err := client.DeleteFile(repository, path); err != nil {
 				return fmt.Errorf("failed to delete file: %w", err)
 			}
 		}

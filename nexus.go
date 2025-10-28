@@ -31,7 +31,6 @@ const (
 // NexusClient represents a client for Nexus OSS API
 type NexusClient struct {
 	BaseURL    string
-	Repository string
 	Username   string
 	Password   string
 	HTTPClient *http.Client
@@ -40,14 +39,13 @@ type NexusClient struct {
 }
 
 // NewNexusClient creates a new Nexus client
-func NewNexusClient(baseURL, repository, username, password string, quiet, dryRun bool) *NexusClient {
+func NewNexusClient(baseURL, username, password string, quiet, dryRun bool) *NexusClient {
 	// Remove trailing slash from baseURL
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	baseURL = strings.TrimSuffix(baseURL, "\\")
 
 	return &NexusClient{
 		BaseURL:    baseURL,
-		Repository: repository,
 		Username:   username,
 		Password:   password,
 		HTTPClient: &http.Client{Timeout: httpTimeout},
@@ -90,21 +88,20 @@ type Asset struct {
 
 // Repository represents a Nexus repository
 type Repository struct {
-	Name       string                 `json:"name"`
-	Format     string                 `json:"format"`
-	Type       string                 `json:"type"`
-	URL        string                 `json:"url"`
-	Attributes map[string]interface{} `json:"attributes"`
+	Name   string `json:"name"`
+	Format string `json:"format"`
+	Type   string `json:"type"`
+	URL    string `json:"url"`
 }
 
 // GetFilesInDirectory gets all files in a directory recursively
-func (c *NexusClient) GetFilesInDirectory(dirPath string) ([]string, error) {
+func (c *NexusClient) GetFilesInDirectory(repository string, dirPath string) ([]string, error) {
 	var allFiles []string
 	continuationToken := ""
 
 	for {
 		// Build search URL
-		searchURL := fmt.Sprintf("%s/service/rest/v1/search/assets?repository=%s", c.BaseURL, c.Repository)
+		searchURL := fmt.Sprintf("%s/service/rest/v1/search/assets?repository=%s", c.BaseURL, repository)
 
 		if dirPath != "" {
 			dirPath = strings.TrimSuffix(dirPath, "/")
@@ -155,8 +152,8 @@ func (c *NexusClient) GetFilesInDirectory(dirPath string) ([]string, error) {
 }
 
 // DeleteFile deletes a file from Nexus repository
-func (c *NexusClient) DeleteFile(filePath string) error {
-	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, c.Repository, filePath)
+func (c *NexusClient) DeleteFile(repository string, filePath string) error {
+	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, filePath)
 
 	if c.DryRun {
 		c.logf("File '%s' planned for deletion from %s", filePath, fileURL)
@@ -184,14 +181,14 @@ func (c *NexusClient) DeleteFile(filePath string) error {
 }
 
 // DeleteDirectory deletes all files in a directory
-func (c *NexusClient) DeleteDirectory(dirPath string) error {
+func (c *NexusClient) DeleteDirectory(repository string, dirPath string) error {
 	// Remove trailing slash
 	dirPath = strings.TrimSuffix(dirPath, "/")
 	dirPath = strings.TrimSuffix(dirPath, "\\")
 
 	c.logf("Deleting directory '%s' from repository...", dirPath)
 
-	files, err := c.GetFilesInDirectory(dirPath)
+	files, err := c.GetFilesInDirectory(repository, dirPath)
 	if err != nil {
 		return fmt.Errorf("failed to get files in directory: %w", err)
 	}
@@ -203,7 +200,7 @@ func (c *NexusClient) DeleteDirectory(dirPath string) error {
 
 	deletedCount := 0
 	for _, filePath := range files {
-		if err := c.DeleteFile(filePath); err != nil {
+		if err := c.DeleteFile(repository, filePath); err != nil {
 			return fmt.Errorf("failed to delete file %s: %w", filePath, err)
 		}
 		deletedCount++
@@ -214,7 +211,7 @@ func (c *NexusClient) DeleteDirectory(dirPath string) error {
 }
 
 // DownloadFile downloads a file from Nexus repository
-func (c *NexusClient) DownloadFile(filePath, destPath string) error {
+func (c *NexusClient) DownloadFile(repository string, filePath string, destPath string) error {
 	// Create destination directory if it doesn't exist
 	if c.DryRun {
 		c.logf("Directory '%s' planned for creation", filepath.Dir(destPath))
@@ -225,7 +222,7 @@ func (c *NexusClient) DownloadFile(filePath, destPath string) error {
 	// Build download URL
 	encodedPath := url.QueryEscape(filePath)
 	downloadURL := fmt.Sprintf("%s/service/rest/v1/search/assets/download?repository=%s&name=%s",
-		c.BaseURL, c.Repository, encodedPath)
+		c.BaseURL, repository, encodedPath)
 
 	c.logf("REST API: %s", downloadURL)
 	c.logf("DESTINATION: %s", destPath)
@@ -263,8 +260,8 @@ func (c *NexusClient) DownloadFile(filePath, destPath string) error {
 }
 
 // UploadFile uploads a file to Nexus repository
-func (c *NexusClient) UploadFile(filePath, destPath string) error {
-	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, c.Repository, destPath)
+func (c *NexusClient) UploadFile(repository string, filePath string, destPath string) error {
+	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, destPath)
 
 	if c.DryRun {
 		c.logf("File '%s' planned for pushing to %s", filePath, fileURL)
@@ -301,14 +298,14 @@ func (c *NexusClient) UploadFile(filePath, destPath string) error {
 }
 
 // UploadDirectory uploads all files in a directory recursively
-func (c *NexusClient) UploadDirectory(dirPath string, relative bool, destination string) error {
+func (c *NexusClient) UploadDirectory(repository string, dirPath string, relative bool, destination string) error {
 	c.logf("Process directory '%s'", dirPath)
 	if destination == "" {
 		c.logf("Destination is empty, using default '/'")
 	}
 	c.logf("Destination: %s", destination)
 
-	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+	uploadFunc := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -332,12 +329,14 @@ func (c *NexusClient) UploadDirectory(dirPath string, relative bool, destination
 		destPath = strings.ReplaceAll(destPath, "\\", "/")
 		c.logf("DestPath: %s", destPath)
 
-		return c.UploadFile(path, destPath)
-	})
+		return c.UploadFile(repository, path, destPath)
+	}
+
+	return filepath.Walk(dirPath, uploadFunc)
 }
 
 // DownloadFileWithPath downloads a file from Nexus repository with custom destination path
-func (c *NexusClient) DownloadFileWithPath(filePath, destination, root string) error {
+func (c *NexusClient) DownloadFileWithPath(repository string, filePath string, destination string, root string) error {
 	c.logf("Download file %s ...", filePath)
 
 	// Build full path if root is specified
@@ -355,11 +354,11 @@ func (c *NexusClient) DownloadFileWithPath(filePath, destination, root string) e
 	c.logf("Destination path: %s", destPath)
 
 	// Download the file
-	return c.DownloadFile(fullPath, destPath)
+	return c.DownloadFile(repository, fullPath, destPath)
 }
 
 // DownloadDirectoryWithPath downloads a directory from Nexus repository with custom destination path
-func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root string, saveStructure bool) error {
+func (c *NexusClient) DownloadDirectoryWithPath(repository string, dirPath string, destination string, root string, saveStructure bool) error {
 	c.logf("Download dir %s ...", dirPath)
 
 	// Build full path if root is specified
@@ -371,7 +370,7 @@ func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root strin
 	}
 
 	// Get all files in directory
-	files, err := c.GetFilesInDirectory(fullPath)
+	files, err := c.GetFilesInDirectory(repository, fullPath)
 	if err != nil {
 		return fmt.Errorf("failed to get files in directory: %w", err)
 	}
@@ -402,7 +401,7 @@ func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root strin
 		c.logf("Destination path: %s", destPath)
 
 		// Download the file
-		if err := c.DownloadFile(file, destPath); err != nil {
+		if err := c.DownloadFile(repository, file, destPath); err != nil {
 			return fmt.Errorf("failed to download file %s: %w", file, err)
 		}
 	}

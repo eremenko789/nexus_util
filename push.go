@@ -61,7 +61,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create Nexus client
-	client := NewNexusClient(config.GetNexusAddress(), repository, config.GetUser(), config.GetPassword(), quiet, dryRun)
+	client := NewNexusClient(config.GetNexusAddress(), config.GetUser(), config.GetPassword(), quiet, dryRun)
 
 	// Process each path
 	for _, path := range args {
@@ -81,7 +81,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		if info.IsDir() {
 			// Upload directory
 			client.logf("path '%s' is directory", path)
-			if err := client.UploadDirectory(path, relative, destination); err != nil {
+			if err := client.UploadDirectory(repository, path, relative, destination); err != nil {
 				return fmt.Errorf("failed to upload directory: %w", err)
 			}
 		} else {
@@ -99,7 +99,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 			// Convert to forward slashes for URL
 			destPath = strings.ReplaceAll(destPath, "\\", "/")
 
-			if err := client.UploadFile(path, destPath); err != nil {
+			if err := client.UploadFile(repository, path, destPath); err != nil {
 				return fmt.Errorf("failed to upload file: %w", err)
 			}
 		}
