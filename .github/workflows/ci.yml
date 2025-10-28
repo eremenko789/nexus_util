@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ 'main', 'master', 'develop', 'feature/*', 'hotfix/*', 'cursor/*' ]
+    branches: [ '*' ]
   pull_request:
-    branches: [ 'main', 'master', 'develop' ]
+    branches: [ '*' ]
   workflow_dispatch:
 
 jobs:
@@ -48,3 +48,68 @@ jobs:
           echo "❌ Build failed!"
           exit 1
         fi
+
+  cross-platform:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+        - os: ubuntu-latest
+          goos: linux
+          goarch: amd64
+        - os: ubuntu-latest
+          goos: linux
+          goarch: arm64
+        - os: ubuntu-latest
+          goos: windows
+          goarch: amd64
+        - os: ubuntu-latest
+          goos: darwin
+          goarch: amd64
+        - os: ubuntu-latest
+          goos: darwin
+          goarch: arm64
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+    
+    - name: Install dependencies
+      run: |
+        echo "Installing Go dependencies..."
+        go mod download
+        go mod tidy
+    
+    - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}..."
+        
+        OUTPUT_NAME=nexus-util
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          OUTPUT_NAME=nexus-util.exe
+        fi
+        
+        go build -o $OUTPUT_NAME .
+        
+        if [ -f "$OUTPUT_NAME" ]; then
+          echo "✅ Build successful for ${{ matrix.goos }}/${{ matrix.goarch }}"
+          ls -la $OUTPUT_NAME
+        else
+          echo "❌ Build failed for ${{ matrix.goos }}/${{ matrix.goarch }}"
+          exit 1
+        fi
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nexus-util-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: nexus-util*
+        retention-days: 7
