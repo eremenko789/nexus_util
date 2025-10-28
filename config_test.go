@@ -4,30 +4,48 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/viper"
 )
 
 func TestLoadConfig(t *testing.T) {
+	// Reset viper to avoid interference from other tests
+	viper.Reset()
+
 	// Test with non-existent config file
 	config, err := LoadConfig("/non/existent/path.yaml", nil)
 	if err != nil {
-		t.Logf("Expected error when config file doesn't exist: %v", err)
+		t.Errorf("Unexpected error when config file doesn't exist: %v", err)
 	}
 	if config == nil {
 		t.Error("Expected config to be created even with no file")
+		return
+	}
+	// Should have empty values since file doesn't exist
+	if config.NexusAddress != "" {
+		t.Errorf("Expected empty NexusAddress, got '%s'", config.NexusAddress)
 	}
 
 	// Test with empty config path (should use default)
 	config, err = LoadConfig("", nil)
 	if err != nil {
-		t.Logf("Expected error when no config file exists: %v", err)
+		t.Errorf("Unexpected error when no config file exists: %v", err)
 	}
 	if config == nil {
 		t.Error("Expected config to be created even with no file")
+		return
+	}
+	// Should have empty values since file doesn't exist
+	if config.NexusAddress != "" {
+		t.Errorf("Expected empty NexusAddress, got '%s'", config.NexusAddress)
 	}
 }
 
 func TestConfigWithFile(t *testing.T) {
 	const testNexusAddress = "http://test-nexus.example.com"
+
+	// Reset viper to avoid interference from other tests
+	viper.Reset()
 
 	// Create a temporary config file
 	tempDir := t.TempDir()
@@ -64,6 +82,9 @@ password: "testpass"
 
 func TestConfigOverride(t *testing.T) {
 	const testNexusAddress = "http://test-nexus.example.com"
+
+	// Reset viper to avoid interference from other tests
+	viper.Reset()
 
 	// Create a temporary config file
 	tempDir := t.TempDir()
@@ -123,6 +144,9 @@ func TestConfigValidation(t *testing.T) {
 
 func TestSaveConfig(t *testing.T) {
 	const testNexusAddress = "http://test-nexus.example.com"
+
+	// Reset viper to avoid interference from other tests
+	viper.Reset()
 
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "test-save-config.yaml")

@@ -50,10 +50,11 @@ func LoadConfig(configPath string, cmdFlags map[string]interface{}) (*Config, er
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		// Check if it's a file not found error or file doesn't exist
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok && !os.IsNotExist(err) {
 			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
-		// Config file not found, continue with defaults
+		// Config file not found or doesn't exist, continue with defaults
 	}
 
 	// Override with command line flags if provided
