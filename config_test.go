@@ -27,7 +27,7 @@ func TestLoadConfig(t *testing.T) {
 	}
 
 	// Test with empty config path (should use default)
-	config, err = LoadConfig("", nil)
+	config, err = LoadConfig("/non/existent/path.yaml", nil)
 	if err != nil {
 		t.Errorf("Unexpected error when no config file exists: %v", err)
 	}

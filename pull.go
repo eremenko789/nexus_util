@@ -77,7 +77,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	destination = strings.TrimSuffix(destination, "\\")
 
 	// Create Nexus client
-	client := NewNexusClient(config.GetNexusAddress(), repository, config.GetUser(), config.GetPassword(), quiet, dryRun)
+	client := NewNexusClient(config.GetNexusAddress(), config.GetUser(), config.GetPassword(), quiet, dryRun)
 
 	// Process each source
 	for _, source := range args {
@@ -89,13 +89,13 @@ func runPull(cmd *cobra.Command, args []string) error {
 		if isDir {
 			// Download directory
 			client.logf("source '%s' is directory", source)
-			if err := client.DownloadDirectoryWithPath(source, destination, root, saveStructure); err != nil {
+			if err := client.DownloadDirectoryWithPath(repository, source, destination, root, saveStructure); err != nil {
 				return fmt.Errorf("failed to download directory: %w", err)
 			}
 		} else {
 			// Download file
 			client.logf("source '%s' is file", source)
-			if err := client.DownloadFileWithPath(source, destination, root); err != nil {
+			if err := client.DownloadFileWithPath(repository, source, destination, root); err != nil {
 				return fmt.Errorf("failed to download file: %w", err)
 			}
 		}

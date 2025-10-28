@@ -53,7 +53,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create Nexus client (repository not needed for listing)
-	client := NewNexusClient(config.GetNexusAddress(), "", config.GetUser(), config.GetPassword(), quiet, dryRun)
+	client := NewNexusClient(config.GetNexusAddress(), config.GetUser(), config.GetPassword(), quiet, dryRun)
 
 	// Debug: output args
 	client.logf("List command args: %v", args)
@@ -76,16 +76,17 @@ func runList(cmd *cobra.Command, args []string) error {
 	defer w.Flush()
 
 	// Print header
-	fmt.Fprintln(w, "NAME\tFORMAT\tTYPE\tURL")
+	fmt.Fprintln(w, "NAME\tFORMAT\tTYPE\tBROWSER")
 	fmt.Fprintln(w, "----\t------\t----\t---")
 
 	// Print repositories
 	for _, repo := range repositories {
+		browseUrl := client.BaseURL + "/#browse/browse:" + repo.Name
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 			repo.Name,
 			repo.Format,
 			repo.Type,
-			repo.URL)
+			browseUrl)
 	}
 
 	return nil
