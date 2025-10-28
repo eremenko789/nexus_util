@@ -9,6 +9,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// File permissions
+	configDirPerm  = 0o755
+	configFilePerm = 0o600
+)
+
 // Config represents the application configuration
 type Config struct {
 	NexusAddress string `yaml:"nexusAddress" mapstructure:"nexusAddress"`
@@ -79,7 +85,7 @@ func SaveConfig(config *Config, configPath string) error {
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, configDirPerm); err != nil {
 		return fmt.Errorf("error creating config directory: %w", err)
 	}
 
@@ -90,7 +96,7 @@ func SaveConfig(config *Config, configPath string) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+	if err := os.WriteFile(configPath, data, configFilePerm); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
 	}
 

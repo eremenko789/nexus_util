@@ -1,0 +1,79 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: nexus-util
+  govet:
+    settings:
+      printf:
+        funcs:
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+  misspell:
+    locale: US
+  nolintlint:
+    allow-leading-space: true
+    allow-unused: false
+    require-explanation: false
+    require-specific: false
+
+linters:
+  enable:
+    - bodyclose
+    - copyloopvar
+    - dogsled
+    - dupl
+    - errcheck
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - mnd
+    - nakedret
+    - noctx
+    - nolintlint
+    - revive
+    - rowserrcheck
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gomnd
+        - funlen
+        - gocyclo
+    - path: main\.go
+      linters:
+        - gochecknoinits
+  max-issues-per-linter: 0
+  max-same-issues: 0

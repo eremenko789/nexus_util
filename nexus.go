@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,20 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+)
+
+const (
+	// HTTP status codes
+	httpStatusOK        = 200
+	httpStatusNoContent = 204
+	httpStatusNotFound  = 404
+
+	// File permissions
+	dirPerm  = 0o755
+	filePerm = 0o600
+
+	// HTTP client timeout
+	httpTimeout = 30 * time.Second
 )
 
 // NexusClient represents a client for Nexus OSS API
@@ -35,14 +50,14 @@ func NewNexusClient(baseURL, repository, username, password string, quiet, dryRu
 		Repository: repository,
 		Username:   username,
 		Password:   password,
-		HTTPClient: &http.Client{Timeout: 30 * time.Second},
+		HTTPClient: &http.Client{Timeout: httpTimeout},
 		Quiet:      quiet,
 		DryRun:     dryRun,
 	}
 }
 
-// log prints a message if not in quiet mode
-func (c *NexusClient) log(format string, args ...interface{}) {
+// logf prints a message if not in quiet mode
+func (c *NexusClient) logf(format string, args ...interface{}) {
 	if !c.Quiet {
 		fmt.Printf(format+"\n", args...)
 	}
@@ -50,7 +65,7 @@ func (c *NexusClient) log(format string, args ...interface{}) {
 
 // makeRequest makes an HTTP request with basic auth
 func (c *NexusClient) makeRequest(method, url string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -93,22 +108,24 @@ func (c *NexusClient) GetFilesInDirectory(dirPath string) ([]string, error) {
 			searchURL += "&continuationToken=" + continuationToken
 		}
 
-		c.log("REST API request: %s", searchURL)
+		c.logf("REST API request: %s", searchURL)
 
 		resp, err := c.makeRequest("GET", searchURL, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to search assets: %w", err)
 		}
-		defer resp.Body.Close()
 
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != httpStatusOK {
+			resp.Body.Close()
 			return nil, fmt.Errorf("search request failed with status %d", resp.StatusCode)
 		}
 
 		var searchResp SearchAssetsResponse
 		if err := json.NewDecoder(resp.Body).Decode(&searchResp); err != nil {
+			resp.Body.Close()
 			return nil, fmt.Errorf("failed to decode search response: %w", err)
 		}
+		resp.Body.Close()
 
 		// Filter files that start with the directory path
 		for _, item := range searchResp.Items {
@@ -124,7 +141,7 @@ func (c *NexusClient) GetFilesInDirectory(dirPath string) ([]string, error) {
 		continuationToken = searchResp.ContinuationToken
 	}
 
-	c.log("Found %d files in directory '%s'", len(allFiles), dirPath)
+	c.logf("Found %d files in directory '%s'", len(allFiles), dirPath)
 	return allFiles, nil
 }
 
@@ -133,11 +150,11 @@ func (c *NexusClient) DeleteFile(filePath string) error {
 	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, c.Repository, filePath)
 
 	if c.DryRun {
-		c.log("File '%s' planned for deletion from %s", filePath, fileURL)
+		c.logf("File '%s' planned for deletion from %s", filePath, fileURL)
 		return nil
 	}
 
-	c.log("Deleting file '%s' from %s...", filePath, fileURL)
+	c.logf("Deleting file '%s' from %s...", filePath, fileURL)
 
 	resp, err := c.makeRequest("DELETE", fileURL, nil)
 	if err != nil {
@@ -146,10 +163,10 @@ func (c *NexusClient) DeleteFile(filePath string) error {
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
-	case 404:
-		c.log("File '%s' not found in repository (404)", filePath)
-	case 204:
-		c.log("File '%s' deleted successfully", filePath)
+	case httpStatusNotFound:
+		c.logf("File '%s' not found in repository (404)", filePath)
+	case httpStatusNoContent:
+		c.logf("File '%s' deleted successfully", filePath)
 	default:
 		return fmt.Errorf("unexpected response code %d for file '%s'", resp.StatusCode, filePath)
 	}
@@ -163,7 +180,7 @@ func (c *NexusClient) DeleteDirectory(dirPath string) error {
 	dirPath = strings.TrimSuffix(dirPath, "/")
 	dirPath = strings.TrimSuffix(dirPath, "\\")
 
-	c.log("Deleting directory '%s' from repository...", dirPath)
+	c.logf("Deleting directory '%s' from repository...", dirPath)
 
 	files, err := c.GetFilesInDirectory(dirPath)
 	if err != nil {
@@ -171,7 +188,7 @@ func (c *NexusClient) DeleteDirectory(dirPath string) error {
 	}
 
 	if len(files) == 0 {
-		c.log("No files found in directory '%s'", dirPath)
+		c.logf("No files found in directory '%s'", dirPath)
 		return nil
 	}
 
@@ -183,7 +200,7 @@ func (c *NexusClient) DeleteDirectory(dirPath string) error {
 		deletedCount++
 	}
 
-	c.log("Directory '%s' deletion completed. %d files processed", dirPath, deletedCount)
+	c.logf("Directory '%s' deletion completed. %d files processed", dirPath, deletedCount)
 	return nil
 }
 
@@ -191,8 +208,8 @@ func (c *NexusClient) DeleteDirectory(dirPath string) error {
 func (c *NexusClient) DownloadFile(filePath, destPath string) error {
 	// Create destination directory if it doesn't exist
 	if c.DryRun {
-		c.log("Directory '%s' planned for creation", filepath.Dir(destPath))
-	} else if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		c.logf("Directory '%s' planned for creation", filepath.Dir(destPath))
+	} else if err := os.MkdirAll(filepath.Dir(destPath), dirPerm); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
@@ -201,11 +218,11 @@ func (c *NexusClient) DownloadFile(filePath, destPath string) error {
 	downloadURL := fmt.Sprintf("%s/service/rest/v1/search/assets/download?repository=%s&name=%s",
 		c.BaseURL, c.Repository, encodedPath)
 
-	c.log("REST API: %s", downloadURL)
-	c.log("DESTINATION: %s", destPath)
+	c.logf("REST API: %s", downloadURL)
+	c.logf("DESTINATION: %s", destPath)
 
 	if c.DryRun {
-		c.log("File '%s' planned for download to %s", filePath, destPath)
+		c.logf("File '%s' planned for download to %s", filePath, destPath)
 		return nil
 	}
 
@@ -215,7 +232,7 @@ func (c *NexusClient) DownloadFile(filePath, destPath string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != httpStatusOK {
 		return fmt.Errorf("download failed with status %d", resp.StatusCode)
 	}
 
@@ -232,7 +249,7 @@ func (c *NexusClient) DownloadFile(filePath, destPath string) error {
 		return fmt.Errorf("failed to write file content: %w", err)
 	}
 
-	c.log("Success file download...")
+	c.logf("Success file download...")
 	return nil
 }
 
@@ -241,11 +258,11 @@ func (c *NexusClient) UploadFile(filePath, destPath string) error {
 	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, c.Repository, destPath)
 
 	if c.DryRun {
-		c.log("File '%s' planned for pushing to %s", filePath, fileURL)
+		c.logf("File '%s' planned for pushing to %s", filePath, fileURL)
 		return nil
 	}
 
-	c.log("File '%s' will be pushed as %s...", filePath, fileURL)
+	c.logf("File '%s' will be pushed as %s...", filePath, fileURL)
 
 	// Read file content
 	file, err := os.Open(filePath)
@@ -266,7 +283,7 @@ func (c *NexusClient) UploadFile(filePath, destPath string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		c.log("Sending file '%s' completed", filePath)
+		c.logf("Sending file '%s' completed", filePath)
 	} else {
 		return fmt.Errorf("upload failed with status %d", resp.StatusCode)
 	}
@@ -276,11 +293,11 @@ func (c *NexusClient) UploadFile(filePath, destPath string) error {
 
 // UploadDirectory uploads all files in a directory recursively
 func (c *NexusClient) UploadDirectory(dirPath string, relative bool, destination string) error {
-	c.log("Process directory '%s'", dirPath)
+	c.logf("Process directory '%s'", dirPath)
 	if destination == "" {
-		c.log("Destination is empty, using default '/'")
+		c.logf("Destination is empty, using default '/'")
 	}
-	c.log("Destination: %s", destination)
+	c.logf("Destination: %s", destination)
 
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -304,7 +321,7 @@ func (c *NexusClient) UploadDirectory(dirPath string, relative bool, destination
 
 		// Convert to forward slashes for URL
 		destPath = strings.ReplaceAll(destPath, "\\", "/")
-		c.log("DestPath: %s", destPath)
+		c.logf("DestPath: %s", destPath)
 
 		return c.UploadFile(path, destPath)
 	})
@@ -312,7 +329,7 @@ func (c *NexusClient) UploadDirectory(dirPath string, relative bool, destination
 
 // DownloadFileWithPath downloads a file from Nexus repository with custom destination path
 func (c *NexusClient) DownloadFileWithPath(filePath, destination, root string) error {
-	c.log("Download file %s ...", filePath)
+	c.logf("Download file %s ...", filePath)
 
 	// Build full path if root is specified
 	var fullPath string
@@ -324,9 +341,9 @@ func (c *NexusClient) DownloadFileWithPath(filePath, destination, root string) e
 
 	// Determine destination path
 	fileName := filepath.Base(filePath)
-	c.log("File name: %s", fileName)
+	c.logf("File name: %s", fileName)
 	destPath := filepath.Join(destination, fileName)
-	c.log("Destination path: %s", destPath)
+	c.logf("Destination path: %s", destPath)
 
 	// Download the file
 	return c.DownloadFile(fullPath, destPath)
@@ -334,7 +351,7 @@ func (c *NexusClient) DownloadFileWithPath(filePath, destination, root string) e
 
 // DownloadDirectoryWithPath downloads a directory from Nexus repository with custom destination path
 func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root string, saveStructure bool) error {
-	c.log("Download dir %s ...", dirPath)
+	c.logf("Download dir %s ...", dirPath)
 
 	// Build full path if root is specified
 	var fullPath string
@@ -352,7 +369,7 @@ func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root strin
 
 	// Download each file
 	for _, file := range files {
-		c.log("file '%s' searched", file)
+		c.logf("file '%s' searched", file)
 
 		// Calculate relative path
 		var relPath string
@@ -364,7 +381,7 @@ func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root strin
 
 		// Get the filename from the variable 'file', which may contain a relative path
 		fileName := filepath.Base(file)
-		c.log("File name: %s", fileName)
+		c.logf("File name: %s", fileName)
 
 		// Build destination path
 		var destPath string
@@ -373,7 +390,7 @@ func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root strin
 		} else {
 			destPath = filepath.Join(destination, fileName)
 		}
-		c.log("Destination path: %s", destPath)
+		c.logf("Destination path: %s", destPath)
 
 		// Download the file
 		if err := c.DownloadFile(file, destPath); err != nil {
@@ -381,6 +398,6 @@ func (c *NexusClient) DownloadDirectoryWithPath(dirPath, destination, root strin
 		}
 	}
 
-	c.log("Success dir %s ...", dirPath)
+	c.logf("Success dir %s ...", dirPath)
 	return nil
 }

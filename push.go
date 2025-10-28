@@ -65,7 +65,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	// Process each path
 	for _, path := range args {
-		client.log("Process path '%s'", path)
+		client.logf("Process path '%s'", path)
 
 		// Check if path exists
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -80,13 +80,13 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 		if info.IsDir() {
 			// Upload directory
-			client.log("path '%s' is directory", path)
+			client.logf("path '%s' is directory", path)
 			if err := client.UploadDirectory(path, relative, destination); err != nil {
 				return fmt.Errorf("failed to upload directory: %w", err)
 			}
 		} else {
 			// Upload file
-			client.log("path '%s' is file", path)
+			client.logf("path '%s' is file", path)
 			var destPath string
 			if relative {
 				destPath = filepath.Base(path)

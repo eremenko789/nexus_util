@@ -27,7 +27,7 @@ Examples:
 	RunE: runInit,
 }
 
-func runInit(cmd *cobra.Command, args []string) error {
+func runInit(cmd *cobra.Command, _ []string) error {
 	// Get flags
 	address, _ := cmd.Flags().GetString("address")
 	user, _ := cmd.Flags().GetString("user")

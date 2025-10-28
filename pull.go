@@ -81,20 +81,20 @@ func runPull(cmd *cobra.Command, args []string) error {
 
 	// Process each source
 	for _, source := range args {
-		client.log("Process source '%s'", source)
+		client.logf("Process source '%s'", source)
 
 		// Determine if it's a directory (ends with /)
 		isDir := strings.HasSuffix(source, "/") || strings.HasSuffix(source, "\\")
 
 		if isDir {
 			// Download directory
-			client.log("source '%s' is directory", source)
+			client.logf("source '%s' is directory", source)
 			if err := client.DownloadDirectoryWithPath(source, destination, root, saveStructure); err != nil {
 				return fmt.Errorf("failed to download directory: %w", err)
 			}
 		} else {
 			// Download file
-			client.log("source '%s' is file", source)
+			client.logf("source '%s' is file", source)
 			if err := client.DownloadFileWithPath(source, destination, root); err != nil {
 				return fmt.Errorf("failed to download file: %w", err)
 			}

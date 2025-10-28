@@ -56,7 +56,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	// Process each path
 	for _, path := range args {
-		client.log("Process path '%s'", path)
+		client.logf("Process path '%s'", path)
 
 		// Determine if it's a directory (ends with /)
 		isDir := strings.HasSuffix(path, "/") || strings.HasSuffix(path, "\\")

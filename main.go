@@ -59,19 +59,27 @@ func init() {
 	// Push command flags
 	pushCmd.Flags().StringP("destination", "d", "", "Destination path in Nexus repository")
 	pushCmd.Flags().Bool("relative", false, "Use relative paths when uploading directories")
-	pushCmd.MarkFlagRequired("repository")
+	if err := pushCmd.MarkFlagRequired("repository"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error marking repository flag as required: %v\n", err)
+	}
 
 	// Pull command flags
 	pullCmd.Flags().StringP("destination", "d", "", "Local destination path (required)")
 	pullCmd.Flags().String("root", "", "Root path in Nexus repository")
 	pullCmd.Flags().BoolP("saveStructure", "s", false, "Save directory structure in destination path")
-	pullCmd.MarkFlagRequired("repository")
+	if err := pullCmd.MarkFlagRequired("repository"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error marking repository flag as required: %v\n", err)
+	}
 
 	// Init command flags
 	initCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")
 	initCmd.Flags().StringP("user", "u", "", "User authentication login (required)")
 	initCmd.Flags().StringP("password", "p", "", "User authentication password")
 	initCmd.Flags().StringP("config", "c", "", "Path to configuration file (default: ~/.nexus-util.yaml)")
-	initCmd.MarkFlagRequired("address")
-	initCmd.MarkFlagRequired("user")
+	if err := initCmd.MarkFlagRequired("address"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error marking address flag as required: %v\n", err)
+	}
+	if err := initCmd.MarkFlagRequired("user"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error marking user flag as required: %v\n", err)
+	}
 }
