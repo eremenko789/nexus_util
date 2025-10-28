@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+    
+    - name: Install dependencies
+      run: |
+        echo "Installing Go dependencies..."
+        go mod download
+        go mod tidy
+    
+    - name: Run tests
+      run: |
+        echo "Running tests..."
+        go test -v ./...
+    
+    - name: Run linter
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
+    
+    - name: Build for current platform
+      run: |
+        echo "Building for current platform..."
+        go build -o nexus-util .
+        
+        if [ -f "nexus-util" ]; then
+          echo "✅ Build successful!"
+          ls -la nexus-util
+        else
+          echo "❌ Build failed!"
+          exit 1
+        fi
