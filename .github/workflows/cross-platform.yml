@@ -2,9 +2,9 @@ name: Cross-Platform Build
 
 on:
   push:
-    branches: [ '*' ]
+    branches: [ 'main', 'master', 'develop', 'feature/*', 'hotfix/*', 'cursor/*' ]
   pull_request:
-    branches: [ '*' ]
+    branches: [ 'main', 'master', 'develop' ]
   workflow_dispatch:
 
 jobs:
