@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -440,4 +441,125 @@ func (c *NexusClient) ListRepositories() ([]Repository, error) {
 
 	c.logf("Found %d repositories", len(repositories))
 	return repositories, nil
+}
+
+// FileExists checks if a file exists in the Nexus repository
+func (c *NexusClient) FileExists(repository string, filePath string) (bool, error) {
+	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, filePath)
+
+	resp, err := c.makeRequest("HEAD", fileURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to check file existence: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode == httpStatusOK, nil
+}
+
+// GetFileSize gets the size of a file from the Nexus repository
+func (c *NexusClient) GetFileSize(repository string, filePath string) (int64, error) {
+	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, filePath)
+
+	resp, err := c.makeRequest("HEAD", fileURL, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get file size: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != httpStatusOK {
+		return 0, fmt.Errorf("file not found (status %d)", resp.StatusCode)
+	}
+
+	contentLength := resp.ContentLength
+	if contentLength < 0 {
+		return 0, fmt.Errorf("invalid content length")
+	}
+
+	return contentLength, nil
+}
+
+// DownloadToBuffer downloads a file into memory
+func (c *NexusClient) DownloadToBuffer(repository string, filePath string) ([]byte, error) {
+	// Build download URL
+	encodedPath := url.QueryEscape(filePath)
+	downloadURL := fmt.Sprintf("%s/service/rest/v1/search/assets/download?repository=%s&name=%s",
+		c.BaseURL, repository, encodedPath)
+
+	c.logf("Downloading to buffer: %s", downloadURL)
+
+	if c.DryRun {
+		c.logf("Dry run: Would download file from %s", downloadURL)
+		return nil, nil
+	}
+	resp, err := c.makeRequest("GET", downloadURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != httpStatusOK {
+		return nil, fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// UploadFromBuffer uploads file content from memory
+func (c *NexusClient) UploadFromBuffer(repository string, destPath string, content []byte) error {
+	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, destPath)
+
+	if c.DryRun {
+		c.logf("File planned for pushing to %s", fileURL)
+		return nil
+	}
+
+	c.logf("Uploading from buffer to %s...", fileURL)
+
+	resp, err := c.makeRequest("PUT", fileURL, bytes.NewReader(content))
+	if err != nil {
+		return fmt.Errorf("failed to upload file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= httpStatusOK && resp.StatusCode < 300 {
+		c.logf("Upload completed")
+	} else {
+		return fmt.Errorf("upload failed with status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// TransferFile transfers a file between two Nexus servers
+func (c *NexusClient) TransferFile(target *NexusClient, sourceRepo string, targetRepo string, filePath string, skipIfExists bool) error {
+	// Download from source
+	c.logf("Downloading '%s' from %s...", filePath, c.BaseURL)
+	content, err := c.DownloadToBuffer(sourceRepo, filePath)
+	if err != nil {
+		return fmt.Errorf("failed to download file: %w", err)
+	}
+
+	// Upload to target
+	c.logf("Uploading '%s' to %s...", filePath, target.BaseURL)
+	if err := target.UploadFromBuffer(targetRepo, filePath, content); err != nil {
+		return fmt.Errorf("failed to upload file: %w", err)
+	}
+
+	return nil
+}
+
+// CheckAvailableSpace checks if there's enough disk space available
+func CheckAvailableSpace(path string, requiredBytes int64) error {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return fmt.Errorf("failed to check disk space: %w", err)
+	}
+
+	// Calculate available space (bytes)
+	availableSpace := int64(stat.Bavail) * int64(stat.Bsize)
+
+	if availableSpace < requiredBytes {
+		return fmt.Errorf("insufficient disk space: available %d bytes, required %d bytes", availableSpace, requiredBytes)
+	}
+
+	return nil
 }

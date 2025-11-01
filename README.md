@@ -7,6 +7,7 @@ A unified command-line tool for managing files and directories in Nexus OSS Raw 
 - **Push**: Upload files and directories to Nexus repository
 - **Pull**: Download files and directories from Nexus repository  
 - **Delete**: Remove files and directories from Nexus repository
+- **Sync**: Transfer contents from one Nexus repository to another
 - **Configuration file**: Store connection details in YAML config file
 - **Cross-platform**: Builds for Linux, Windows, macOS, FreeBSD, OpenBSD, NetBSD
 - **Multiple architectures**: AMD64, ARM64, ARM, 386
@@ -129,6 +130,47 @@ nexus-util delete -a http://nexus.example.com -r myrepo -u user -p pass dir/
 nexus-util delete --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt
 ```
 
+### Sync Command
+
+Transfer contents from one Nexus repository to another Nexus repository.
+
+```bash
+# Transfer entire repository from one server to another
+nexus-util sync --source-address http://source.example.com --source-repo myrepo \
+                 --target-address http://target.example.com --target-repo myrepo
+
+# Transfer with skip for existing files
+nexus-util sync --source-address http://source.example.com --source-repo myrepo \
+                 --target-address http://target.example.com --target-repo myrepo \
+                 --skip-existing
+
+# Transfer with detailed progress
+nexus-util sync --source-address http://source.example.com --source-repo myrepo \
+                 --target-address http://target.example.com --target-repo myrepo \
+                 --show-progress
+
+# Use config for source and/or target
+nexus-util sync --source-repo myrepo \
+                 --target-address http://target.example.com --target-repo myrepo
+
+# Sync with different authentication for source and target
+nexus-util sync --source-address http://source.example.com --source-user user1 --source-pass pass1 \
+                 --source-repo myrepo --target-address http://target.example.com --target-user user2 \
+                 --target-pass pass2 --target-repo myrepo
+```
+
+**Sync-specific flags:**
+- `--source-address`: Source Nexus OSS host address
+- `--source-repo`: Source Nexus repository name (required)
+- `--source-user`: Source user authentication login
+- `--source-pass`: Source user authentication password
+- `--target-address`: Target Nexus OSS host address
+- `--target-repo`: Target Nexus repository name (required)
+- `--target-user`: Target user authentication login
+- `--target-pass`: Target user authentication password
+- `--skip-existing`: Skip files that already exist in target repository
+- `--show-progress`: Show detailed progress for each file
+
 ### Init Command
 
 Initialize configuration file with default values.
@@ -202,6 +244,23 @@ nexus-util delete -u admin -p adminpass myproject/v0.9.0/
 
 # Dry run to see what would be deleted
 nexus-util delete --dry old-files/
+```
+
+### Sync between servers
+
+```bash
+# Transfer entire repository from source to target
+nexus-util sync --source-address http://source.example.com --source-repo releases \
+                 --target-address http://target.example.com --target-repo releases
+
+# Sync with skip for files that already exist
+nexus-util sync --source-address http://source.example.com --source-repo releases \
+                 --target-address http://target.example.com --target-repo releases \
+                 --skip-existing --show-progress
+
+# Sync using config for one server
+nexus-util sync --source-repo releases \
+                 --target-address http://target.example.com --target-repo releases
 ```
 
 ### Using Custom Configuration Files
