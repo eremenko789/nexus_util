@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -542,23 +541,6 @@ func (c *NexusClient) TransferFile(target *NexusClient, sourceRepo string, targe
 	c.logf("Uploading '%s' to %s...", filePath, target.BaseURL)
 	if err := target.UploadFromBuffer(targetRepo, filePath, content); err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
-	}
-
-	return nil
-}
-
-// CheckAvailableSpace checks if there's enough disk space available
-func CheckAvailableSpace(path string, requiredBytes int64) error {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil {
-		return fmt.Errorf("failed to check disk space: %w", err)
-	}
-
-	// Calculate available space (bytes)
-	availableSpace := int64(stat.Bavail) * int64(stat.Bsize)
-
-	if availableSpace < requiredBytes {
-		return fmt.Errorf("insufficient disk space: available %d bytes, required %d bytes", availableSpace, requiredBytes)
 	}
 
 	return nil
