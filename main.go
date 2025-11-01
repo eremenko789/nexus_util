@@ -49,6 +49,7 @@ Configuration:
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(syncCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -82,5 +83,24 @@ func init() {
 	}
 	if err := initCmd.MarkFlagRequired("user"); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marking user flag as required: %v\n", err)
+	}
+
+	// Sync command flags
+	syncCmd.Flags().String("source-address", "", "Source Nexus OSS host address")
+	syncCmd.Flags().String("source-repo", "", "Source Nexus repository name (required)")
+	syncCmd.Flags().String("source-user", "", "Source user authentication login")
+	syncCmd.Flags().String("source-pass", "", "Source user authentication password")
+	syncCmd.Flags().String("target-address", "", "Target Nexus OSS host address")
+	syncCmd.Flags().String("target-repo", "", "Target Nexus repository name (required)")
+	syncCmd.Flags().String("target-user", "", "Target user authentication login")
+	syncCmd.Flags().String("target-pass", "", "Target user authentication password")
+	syncCmd.Flags().Bool("skip-existing", true, "Skip files that already exist in target repository")
+	syncCmd.Flags().Bool("show-progress", true, "Show detailed progress for each file")
+
+	if err := syncCmd.MarkFlagRequired("source-repo"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error marking source-repo flag as required: %v\n", err)
+	}
+	if err := syncCmd.MarkFlagRequired("target-repo"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error marking target-repo flag as required: %v\n", err)
 	}
 }
