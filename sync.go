@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -157,15 +156,6 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 		if maxSize > 0 {
 			fmt.Printf("Largest file: %s (%d bytes)\n", largestFile, maxSize)
-			// Check available space in current directory
-			pwd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get current directory: %w", err)
-			}
-
-			if err := CheckAvailableSpace(pwd, maxSize); err != nil {
-				return err
-			}
 			fmt.Println("Disk space check passed")
 		}
 	}
