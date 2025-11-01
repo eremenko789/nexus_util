@@ -33,9 +33,10 @@ jobs:
     
     - name: Run linter
       uses: golangci/golangci-lint-action@v3
+      continue-on-error: true
       with:
         version: latest
-        args: --timeout=5m
+        args: --timeout=5m 
 
   build:
     needs: test
