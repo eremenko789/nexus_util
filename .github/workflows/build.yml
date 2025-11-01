@@ -61,10 +61,6 @@ jobs:
           goarch: arm64
         - goos: freebsd
           goarch: amd64
-        - goos: openbsd
-          goarch: amd64
-        - goos: netbsd
-          goarch: amd64
     
     steps:
     - uses: actions/checkout@v4
