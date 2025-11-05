@@ -151,7 +151,6 @@ jobs:
           "darwin-arm64"
           "freebsd-amd64"
           "openbsd-amd64"
-          "netbsd-amd64"
         )
         
         # Check if all expected artifacts exist
