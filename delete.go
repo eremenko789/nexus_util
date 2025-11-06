@@ -15,13 +15,13 @@ This command combines the functionality of the original nexus_delete.py script.
 
 Examples:
   # Delete a single file
-  nexus-util delete -a http://nexus.example.com -r myrepo -u user -p pass file.txt
+  nexus-util asset delete -a http://nexus.example.com -r myrepo -u user -p pass file.txt
 
   # Delete a directory
-  nexus-util delete -a http://nexus.example.com -r myrepo -u user -p pass dir/
+  nexus-util asset delete -a http://nexus.example.com -r myrepo -u user -p pass dir/
 
   # Dry run to see what would be deleted
-  nexus-util delete --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt`,
+  nexus-util asset delete --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runDelete,
 }

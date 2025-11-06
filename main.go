@@ -43,9 +43,7 @@ Configuration:
 	rootCmd.PersistentFlags().Bool("dry", false, "Dry run - show what would be done without actually doing it")
 
 	// Add commands
-	rootCmd.AddCommand(pushCmd)
-	rootCmd.AddCommand(pullCmd)
-	rootCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(assetCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(repoCmd)
 	rootCmd.AddCommand(syncCmd)
@@ -57,20 +55,25 @@ Configuration:
 }
 
 func init() {
+	// Asset command - add repository flag as persistent flag
+	assetCmd.PersistentFlags().StringP("repository", "r", "", "Nexus OSS raw repository name (required)")
+	if err := assetCmd.MarkPersistentFlagRequired("repository"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error marking repository flag as required: %v\n", err)
+	}
+
+	// Add subcommands to asset command
+	assetCmd.AddCommand(pushCmd)
+	assetCmd.AddCommand(pullCmd)
+	assetCmd.AddCommand(deleteCmd)
+
 	// Push command flags
 	pushCmd.Flags().StringP("destination", "d", "", "Destination path in Nexus repository")
 	pushCmd.Flags().Bool("relative", false, "Use relative paths when uploading directories")
-	if err := pushCmd.MarkFlagRequired("repository"); err != nil {
-		fmt.Fprintf(os.Stderr, "Error marking repository flag as required: %v\n", err)
-	}
 
 	// Pull command flags
 	pullCmd.Flags().StringP("destination", "d", "", "Local destination path (required)")
 	pullCmd.Flags().String("root", "", "Root path in Nexus repository")
 	pullCmd.Flags().BoolP("saveStructure", "s", false, "Save directory structure in destination path")
-	if err := pullCmd.MarkFlagRequired("repository"); err != nil {
-		fmt.Fprintf(os.Stderr, "Error marking repository flag as required: %v\n", err)
-	}
 
 	// Init command flags
 	initCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")

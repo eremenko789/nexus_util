@@ -70,7 +70,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 
 	fmt.Printf("Configuration saved to: %s\n", actualPath)
 	fmt.Println("You can now use nexus-util commands without specifying connection details.")
-	fmt.Println("Example: nexus-util push file.txt")
+	fmt.Println("Example: nexus-util asset push -r myrepo file.txt")
 
 	return nil
 }
