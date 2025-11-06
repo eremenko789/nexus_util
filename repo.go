@@ -8,21 +8,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listCmd = &cobra.Command{
-	Use:   "list",
+var repoCmd = &cobra.Command{
+	Use:   "repo",
+	Short: "Repository management commands",
+	Long:  "Commands for managing Nexus repositories",
+}
+
+var repoLsCmd = &cobra.Command{
+	Use:   "ls",
 	Short: "List all repositories in Nexus instance",
 	Long: `List all repositories configured in the Nexus instance with their types and formats.
 This command uses the Nexus REST API to retrieve repository information.
 
 Examples:
   # List all repositories
-  nexus-util list -a http://nexus.example.com -u user -p pass
+  nexus-util repo ls -a http://nexus.example.com -u user -p pass
 
   # List repositories in quiet mode
-  nexus-util list -q -a http://nexus.example.com -u user -p pass
+  nexus-util repo ls -q -a http://nexus.example.com -u user -p pass
 
   # List repositories with custom config file
-  nexus-util list -c /path/to/config.yaml`,
+  nexus-util repo ls -c /path/to/config.yaml`,
 	RunE: runList,
 }
 
@@ -90,4 +96,8 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func init() {
+	repoCmd.AddCommand(repoLsCmd)
 }
