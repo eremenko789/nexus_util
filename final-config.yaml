@@ -1,5 +1,0 @@
-nexus:
-    address: http://test.nexus.com
-repository: testrepo
-user: testuser
-password: testpass

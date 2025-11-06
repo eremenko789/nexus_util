@@ -1,4 +1,4 @@
-package main
+package asset
 
 import (
 	"fmt"
@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"nexus-util/config"
+	"nexus-util/nexus"
 	"github.com/spf13/cobra"
 )
 
-var pushCmd = &cobra.Command{
+var PushCmd = &cobra.Command{
 	Use:   "push [flags] <path>...",
 	Short: "Upload files or directories to Nexus repository",
 	Long: `Upload files or directories to Nexus OSS Raw Repository.
@@ -46,7 +48,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 	relative, _ := cmd.Flags().GetBool("relative")
 
 	// Load configuration
-	config, err := LoadConfigWithFlags(configPath, map[string]interface{}{
+	cfg, err := config.LoadConfigWithFlags(configPath, map[string]interface{}{
 		"nexusAddress": address,
 		"user":         username,
 		"password":     password,
@@ -56,16 +58,16 @@ func runPush(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate configuration
-	if err := config.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	// Create Nexus client
-	client := NewNexusClient(config.GetNexusAddress(), config.GetUser(), config.GetPassword(), quiet, dryRun)
+	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
 	// Process each path
 	for _, path := range args {
-		client.logf("Process path '%s'", path)
+		client.Logf("Process path '%s'", path)
 
 		// Check if path exists
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -80,13 +82,13 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 		if info.IsDir() {
 			// Upload directory
-			client.logf("path '%s' is directory", path)
+			client.Logf("path '%s' is directory", path)
 			if err := client.UploadDirectory(repository, path, relative, destination); err != nil {
 				return fmt.Errorf("failed to upload directory: %w", err)
 			}
 		} else {
 			// Upload file
-			client.logf("path '%s' is file", path)
+			client.Logf("path '%s' is file", path)
 			var destPath string
 			if relative {
 				destPath = filepath.Base(path)
@@ -111,7 +113,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		linkDest = "."
 	}
 	linkDest = strings.ReplaceAll(linkDest, "/", "%2F")
-	linkURL := fmt.Sprintf("%s/#browse/browse:%s:%s", config.GetNexusAddress(), repository, linkDest)
+	linkURL := fmt.Sprintf("%s/#browse/browse:%s:%s", cfg.GetNexusAddress(), repository, linkDest)
 	fmt.Println(linkURL)
 
 	if !quiet {
@@ -120,3 +122,4 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+

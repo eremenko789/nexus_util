@@ -1,12 +1,13 @@
-package main
+package initcmd
 
 import (
 	"fmt"
 
+	"nexus-util/config"
 	"github.com/spf13/cobra"
 )
 
-var initCmd = &cobra.Command{
+var InitCmd = &cobra.Command{
 	Use:   "init [flags]",
 	Short: "Initialize configuration file with default values",
 	Long: `Initialize a configuration file with default values for Nexus connection.
@@ -46,26 +47,26 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Create config
-	config := &Config{
+	cfg := &config.Config{
 		NexusAddress: address,
 		User:         user,
 		Password:     password,
 	}
 
 	// Validate config
-	if err := config.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	// Save config
-	if err := SaveConfig(config, configPath); err != nil {
+	if err := config.SaveConfig(cfg, configPath); err != nil {
 		return fmt.Errorf("error saving configuration: %w", err)
 	}
 
 	// Show success message
 	actualPath := configPath
 	if actualPath == "" {
-		actualPath = DefaultConfigPath()
+		actualPath = config.DefaultConfigPath()
 	}
 
 	fmt.Printf("Configuration saved to: %s\n", actualPath)
@@ -83,3 +84,4 @@ func readPassword() (string, error) {
 	_, err := fmt.Scanln(&password)
 	return password, err
 }
+

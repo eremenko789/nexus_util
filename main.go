@@ -4,6 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"nexus-util/cmd/asset"
+	initcmd "nexus-util/cmd/init"
+	"nexus-util/cmd/repo"
+	"nexus-util/cmd/sync"
+
 	"github.com/spf13/cobra"
 )
 
@@ -42,11 +47,14 @@ Configuration:
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Quiet mode - minimal output")
 	rootCmd.PersistentFlags().Bool("dry", false, "Dry run - show what would be done without actually doing it")
 
+	// Initialize commands
+	setupCommands()
+
 	// Add commands
-	rootCmd.AddCommand(assetCmd)
-	rootCmd.AddCommand(initCmd)
-	rootCmd.AddCommand(repoCmd)
-	rootCmd.AddCommand(syncCmd)
+	rootCmd.AddCommand(asset.AssetCmd)
+	rootCmd.AddCommand(initcmd.InitCmd)
+	rootCmd.AddCommand(repo.RepoCmd)
+	rootCmd.AddCommand(sync.SyncCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -54,55 +62,55 @@ Configuration:
 	}
 }
 
-func init() {
+func setupCommands() {
 	// Asset command - add repository flag as persistent flag
-	assetCmd.PersistentFlags().StringP("repository", "r", "", "Nexus OSS raw repository name (required)")
-	if err := assetCmd.MarkPersistentFlagRequired("repository"); err != nil {
+	asset.AssetCmd.PersistentFlags().StringP("repository", "r", "", "Nexus OSS raw repository name (required)")
+	if err := asset.AssetCmd.MarkPersistentFlagRequired("repository"); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marking repository flag as required: %v\n", err)
 	}
 
 	// Add subcommands to asset command
-	assetCmd.AddCommand(pushCmd)
-	assetCmd.AddCommand(pullCmd)
-	assetCmd.AddCommand(deleteCmd)
+	asset.AssetCmd.AddCommand(asset.PushCmd)
+	asset.AssetCmd.AddCommand(asset.PullCmd)
+	asset.AssetCmd.AddCommand(asset.DeleteCmd)
 
 	// Push command flags
-	pushCmd.Flags().StringP("destination", "d", "", "Destination path in Nexus repository")
-	pushCmd.Flags().Bool("relative", false, "Use relative paths when uploading directories")
+	asset.PushCmd.Flags().StringP("destination", "d", "", "Destination path in Nexus repository")
+	asset.PushCmd.Flags().Bool("relative", false, "Use relative paths when uploading directories")
 
 	// Pull command flags
-	pullCmd.Flags().StringP("destination", "d", "", "Local destination path (required)")
-	pullCmd.Flags().String("root", "", "Root path in Nexus repository")
-	pullCmd.Flags().BoolP("saveStructure", "s", false, "Save directory structure in destination path")
+	asset.PullCmd.Flags().StringP("destination", "d", "", "Local destination path (required)")
+	asset.PullCmd.Flags().String("root", "", "Root path in Nexus repository")
+	asset.PullCmd.Flags().BoolP("saveStructure", "s", false, "Save directory structure in destination path")
 
 	// Init command flags
-	initCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")
-	initCmd.Flags().StringP("user", "u", "", "User authentication login (required)")
-	initCmd.Flags().StringP("password", "p", "", "User authentication password")
-	initCmd.Flags().StringP("config", "c", "", "Path to configuration file (default: ~/.nexus-util.yaml)")
-	if err := initCmd.MarkFlagRequired("address"); err != nil {
+	initcmd.InitCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")
+	initcmd.InitCmd.Flags().StringP("user", "u", "", "User authentication login (required)")
+	initcmd.InitCmd.Flags().StringP("password", "p", "", "User authentication password")
+	initcmd.InitCmd.Flags().StringP("config", "c", "", "Path to configuration file (default: ~/.nexus-util.yaml)")
+	if err := initcmd.InitCmd.MarkFlagRequired("address"); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marking address flag as required: %v\n", err)
 	}
-	if err := initCmd.MarkFlagRequired("user"); err != nil {
+	if err := initcmd.InitCmd.MarkFlagRequired("user"); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marking user flag as required: %v\n", err)
 	}
 
 	// Sync command flags
-	syncCmd.Flags().String("source-address", "", "Source Nexus OSS host address")
-	syncCmd.Flags().String("source-repo", "", "Source Nexus repository name (required)")
-	syncCmd.Flags().String("source-user", "", "Source user authentication login")
-	syncCmd.Flags().String("source-pass", "", "Source user authentication password")
-	syncCmd.Flags().String("target-address", "", "Target Nexus OSS host address")
-	syncCmd.Flags().String("target-repo", "", "Target Nexus repository name (required)")
-	syncCmd.Flags().String("target-user", "", "Target user authentication login")
-	syncCmd.Flags().String("target-pass", "", "Target user authentication password")
-	syncCmd.Flags().Bool("skip-existing", true, "Skip files that already exist in target repository")
-	syncCmd.Flags().Bool("show-progress", true, "Show detailed progress for each file")
+	sync.SyncCmd.Flags().String("source-address", "", "Source Nexus OSS host address")
+	sync.SyncCmd.Flags().String("source-repo", "", "Source Nexus repository name (required)")
+	sync.SyncCmd.Flags().String("source-user", "", "Source user authentication login")
+	sync.SyncCmd.Flags().String("source-pass", "", "Source user authentication password")
+	sync.SyncCmd.Flags().String("target-address", "", "Target Nexus OSS host address")
+	sync.SyncCmd.Flags().String("target-repo", "", "Target Nexus repository name (required)")
+	sync.SyncCmd.Flags().String("target-user", "", "Target user authentication login")
+	sync.SyncCmd.Flags().String("target-pass", "", "Target user authentication password")
+	sync.SyncCmd.Flags().Bool("skip-existing", true, "Skip files that already exist in target repository")
+	sync.SyncCmd.Flags().Bool("show-progress", true, "Show detailed progress for each file")
 
-	if err := syncCmd.MarkFlagRequired("source-repo"); err != nil {
+	if err := sync.SyncCmd.MarkFlagRequired("source-repo"); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marking source-repo flag as required: %v\n", err)
 	}
-	if err := syncCmd.MarkFlagRequired("target-repo"); err != nil {
+	if err := sync.SyncCmd.MarkFlagRequired("target-repo"); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marking target-repo flag as required: %v\n", err)
 	}
 }
