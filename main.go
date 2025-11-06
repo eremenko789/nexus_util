@@ -36,7 +36,6 @@ Configuration:
 
 	// Add global flags
 	rootCmd.PersistentFlags().StringP("address", "a", "", "Nexus OSS host address (overrides config file)")
-	rootCmd.PersistentFlags().StringP("repository", "r", "", "Nexus OSS raw repository name (overrides config file)")
 	rootCmd.PersistentFlags().StringP("user", "u", "", "User authentication login (overrides config file)")
 	rootCmd.PersistentFlags().StringP("password", "p", "", "User authentication password (overrides config file)")
 	rootCmd.PersistentFlags().StringP("config", "c", "", "Path to configuration file (default: ~/.nexus-util.yaml)")
@@ -48,7 +47,7 @@ Configuration:
 	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(initCmd)
-	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(repoCmd)
 	rootCmd.AddCommand(syncCmd)
 
 	if err := rootCmd.Execute(); err != nil {
