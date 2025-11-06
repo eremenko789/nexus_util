@@ -17,16 +17,16 @@ This command combines the functionality of the original nexus_push.py script.
 
 Examples:
   # Upload a single file
-  nexus-util push -a http://nexus.example.com -r myrepo -u user -p pass file.txt
+  nexus-util asset push -a http://nexus.example.com -r myrepo -u user -p pass file.txt
 
   # Upload a directory
-  nexus-util push -a http://nexus.example.com -r myrepo -u user -p pass ./localdir/
+  nexus-util asset push -a http://nexus.example.com -r myrepo -u user -p pass ./localdir/
 
   # Upload with custom destination path
-  nexus-util push -a http://nexus.example.com -r myrepo -u user -p pass -d custom/path file.txt
+  nexus-util asset push -a http://nexus.example.com -r myrepo -u user -p pass -d custom/path file.txt
 
   # Dry run to see what would be uploaded
-  nexus-util push --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt`,
+  nexus-util asset push --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runPush,
 }

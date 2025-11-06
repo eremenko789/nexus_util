@@ -16,16 +16,16 @@ This command combines the functionality of the original nexus_pull.py script.
 
 Examples:
   # Download a single file
-  nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads file.txt
+  nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads file.txt
 
   # Download a directory
-  nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/
+  nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/
 
   # Download with custom root path
-  nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --root custom/path file.txt
+  nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --root custom/path file.txt
   
   # Save directory structure
-  nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --saveStructure dir/subdir1/subdir2/`,
+  nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --saveStructure dir/subdir1/subdir2/`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runPull,
 }
