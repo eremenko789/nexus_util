@@ -1,13 +1,15 @@
-package main
+package asset
 
 import (
 	"fmt"
 	"strings"
 
+	"nexus-util/config"
+	"nexus-util/nexus"
 	"github.com/spf13/cobra"
 )
 
-var deleteCmd = &cobra.Command{
+var DeleteCmd = &cobra.Command{
 	Use:   "delete [flags] <path>...",
 	Short: "Delete files or directories from Nexus repository",
 	Long: `Delete files or directories from Nexus OSS Raw Repository.
@@ -37,7 +39,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	dryRun, _ := cmd.Flags().GetBool("dry")
 
 	// Load configuration
-	config, err := LoadConfigWithFlags(configPath, map[string]interface{}{
+	cfg, err := config.LoadConfigWithFlags(configPath, map[string]interface{}{
 		"nexusAddress": address,
 		"user":         username,
 		"password":     password,
@@ -47,16 +49,16 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate configuration
-	if err := config.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	// Create Nexus client
-	client := NewNexusClient(config.GetNexusAddress(), config.GetUser(), config.GetPassword(), quiet, dryRun)
+	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
 	// Process each path
 	for _, path := range args {
-		client.logf("Process path '%s'", path)
+		client.Logf("Process path '%s'", path)
 
 		// Determine if it's a directory (ends with /)
 		isDir := strings.HasSuffix(path, "/") || strings.HasSuffix(path, "\\")
@@ -75,7 +77,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print browse URL
-	linkURL := fmt.Sprintf("%s/#browse/browse:%s", config.GetNexusAddress(), repository)
+	linkURL := fmt.Sprintf("%s/#browse/browse:%s", cfg.GetNexusAddress(), repository)
 	fmt.Println(linkURL)
 
 	if !quiet {
@@ -84,3 +86,4 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+

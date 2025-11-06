@@ -1,12 +1,14 @@
-package main
+package sync
 
 import (
 	"fmt"
 
+	"nexus-util/config"
+	"nexus-util/nexus"
 	"github.com/spf13/cobra"
 )
 
-var syncCmd = &cobra.Command{
+var SyncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Transfer contents from one Nexus repository to another",
 	Long: `Transfer contents from one Nexus server/repository to another Nexus server/repository.
@@ -54,7 +56,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	showProgress, _ := cmd.Flags().GetBool("show-progress")
 
 	// Load configuration for fallback values
-	sourceConfig, err := LoadConfigWithFlags(configPath, map[string]interface{}{
+	sourceConfig, err := config.LoadConfigWithFlags(configPath, map[string]interface{}{
 		"nexusAddress": sourceAddress,
 		"user":         sourceUser,
 		"password":     sourcePassword,
@@ -63,7 +65,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error loading source configuration: %w", err)
 	}
 
-	targetConfig, err := LoadConfigWithFlags(configPath, map[string]interface{}{
+	targetConfig, err := config.LoadConfigWithFlags(configPath, map[string]interface{}{
 		"nexusAddress": targetAddress,
 		"user":         targetUser,
 		"password":     targetPassword,
@@ -119,8 +121,8 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create clients
-	sourceClient := NewNexusClient(finalSourceAddress, sourceUsername, sourcePass, quiet, dryRun)
-	targetClient := NewNexusClient(finalTargetAddress, targetUsername, targetPass, quiet, dryRun)
+	sourceClient := nexus.NewNexusClient(finalSourceAddress, sourceUsername, sourcePass, quiet, dryRun)
+	targetClient := nexus.NewNexusClient(finalTargetAddress, targetUsername, targetPass, quiet, dryRun)
 
 	// Get all files from source repository
 	fmt.Printf("Scanning source repository '%s' on %s...\n", sourceRepo, finalSourceAddress)
@@ -145,7 +147,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 			size, err := sourceClient.GetFileSize(sourceRepo, file)
 			if err != nil {
 				// Log but continue
-				sourceClient.logf("Warning: failed to get size for %s: %v", file, err)
+				sourceClient.Logf("Warning: failed to get size for %s: %v", file, err)
 				continue
 			}
 			if size > maxSize {
@@ -173,7 +175,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		if skipExisting {
 			exists, err := targetClient.FileExists(targetRepo, file)
 			if err != nil {
-				sourceClient.logf("Warning: failed to check if file exists in target: %v", err)
+				sourceClient.Logf("Warning: failed to check if file exists in target: %v", err)
 			} else if exists {
 				if showProgress {
 					fmt.Printf("  Skipped (already exists)\n")
@@ -195,3 +197,4 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+

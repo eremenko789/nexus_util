@@ -1,14 +1,16 @@
-package main
+package asset
 
 import (
 	"fmt"
 	"os"
 	"strings"
 
+	"nexus-util/config"
+	"nexus-util/nexus"
 	"github.com/spf13/cobra"
 )
 
-var pullCmd = &cobra.Command{
+var PullCmd = &cobra.Command{
 	Use:   "pull [flags] <source>...",
 	Short: "Download files or directories from Nexus repository",
 	Long: `Download files or directories from Nexus OSS Raw Repository.
@@ -46,7 +48,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	saveStructure, _ := cmd.Flags().GetBool("saveStructure")
 
 	// Load configuration
-	config, err := LoadConfigWithFlags(configPath, map[string]interface{}{
+	cfg, err := config.LoadConfigWithFlags(configPath, map[string]interface{}{
 		"nexusAddress": address,
 		"user":         username,
 		"password":     password,
@@ -56,7 +58,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate configuration
-	if err := config.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("configuration error: %w", err)
 	}
 
@@ -77,24 +79,24 @@ func runPull(cmd *cobra.Command, args []string) error {
 	destination = strings.TrimSuffix(destination, "\\")
 
 	// Create Nexus client
-	client := NewNexusClient(config.GetNexusAddress(), config.GetUser(), config.GetPassword(), quiet, dryRun)
+	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
 	// Process each source
 	for _, source := range args {
-		client.logf("Process source '%s'", source)
+		client.Logf("Process source '%s'", source)
 
 		// Determine if it's a directory (ends with /)
 		isDir := strings.HasSuffix(source, "/") || strings.HasSuffix(source, "\\")
 
 		if isDir {
 			// Download directory
-			client.logf("source '%s' is directory", source)
+			client.Logf("source '%s' is directory", source)
 			if err := client.DownloadDirectoryWithPath(repository, source, destination, root, saveStructure); err != nil {
 				return fmt.Errorf("failed to download directory: %w", err)
 			}
 		} else {
 			// Download file
-			client.logf("source '%s' is file", source)
+			client.Logf("source '%s' is file", source)
 			if err := client.DownloadFileWithPath(repository, source, destination, root); err != nil {
 				return fmt.Errorf("failed to download file: %w", err)
 			}
@@ -107,3 +109,4 @@ func runPull(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+

@@ -1,20 +1,22 @@
-package main
+package repo
 
 import (
 	"fmt"
 	"os"
 	"text/tabwriter"
 
+	"nexus-util/config"
+	"nexus-util/nexus"
 	"github.com/spf13/cobra"
 )
 
-var repoCmd = &cobra.Command{
+var RepoCmd = &cobra.Command{
 	Use:   "repo",
 	Short: "Repository management commands",
 	Long:  "Commands for managing Nexus repositories",
 }
 
-var repoLsCmd = &cobra.Command{
+var RepoLsCmd = &cobra.Command{
 	Use:   "ls",
 	Short: "List all repositories in Nexus instance",
 	Long: `List all repositories configured in the Nexus instance with their types and formats.
@@ -48,21 +50,21 @@ func runList(cmd *cobra.Command, args []string) error {
 		"password":     password,
 	}
 
-	config, err := LoadConfigWithFlags(configPath, flags)
+	cfg, err := config.LoadConfigWithFlags(configPath, flags)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	// Validate configuration
-	if err := config.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("configuration validation failed: %w", err)
 	}
 
 	// Create Nexus client (repository not needed for listing)
-	client := NewNexusClient(config.GetNexusAddress(), config.GetUser(), config.GetPassword(), quiet, dryRun)
+	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
 	// Debug: output args
-	client.logf("List command args: %v", args)
+	client.Logf("List command args: %v", args)
 
 	// List repositories
 	repositories, err := client.ListRepositories()
@@ -99,5 +101,6 @@ func runList(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	repoCmd.AddCommand(repoLsCmd)
+	RepoCmd.AddCommand(RepoLsCmd)
 }
+
