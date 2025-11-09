@@ -73,6 +73,7 @@ func setupCommands() {
 	asset.AssetCmd.AddCommand(asset.PushCmd)
 	asset.AssetCmd.AddCommand(asset.PullCmd)
 	asset.AssetCmd.AddCommand(asset.DeleteCmd)
+	asset.AssetCmd.AddCommand(asset.ListCmd)
 
 	// Push command flags
 	asset.PushCmd.Flags().StringP("destination", "d", "", "Destination path in Nexus repository")
