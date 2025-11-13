@@ -56,3 +56,23 @@ func TestNexusClientHTTPClient(t *testing.T) {
 		t.Error("Expected HTTPClient to be initialized")
 	}
 }
+
+func TestEncodeRepositoryPathWithSpaces(t *testing.T) {
+	encoded := encodeRepositoryPath("dir/with space/file name.txt")
+
+	expected := "dir/with%20space/file%20name.txt"
+	if encoded != expected {
+		t.Fatalf("Expected encoded path '%s', got '%s'", expected, encoded)
+	}
+}
+
+func TestRepositoryURLWithSpaces(t *testing.T) {
+	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, false)
+
+	got := client.repositoryURL("myrepo", "dir/with space/file name.txt")
+	expected := "http://test-nexus.example.com/repository/myrepo/dir/with%20space/file%20name.txt"
+
+	if got != expected {
+		t.Fatalf("Expected repository URL '%s', got '%s'", expected, got)
+	}
+}

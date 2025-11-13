@@ -38,6 +38,19 @@ type NexusClient struct {
 	DryRun     bool
 }
 
+func encodeRepositoryPath(path string) string {
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		segments[i] = url.PathEscape(segment)
+	}
+	return strings.Join(segments, "/")
+}
+
+func (c *NexusClient) repositoryURL(repository, assetPath string) string {
+	encodedPath := encodeRepositoryPath(assetPath)
+	return fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, encodedPath)
+}
+
 // NewNexusClient creates a new Nexus client
 func NewNexusClient(baseURL, username, password string, quiet, dryRun bool) *NexusClient {
 	// Remove trailing slash from baseURL
@@ -153,7 +166,7 @@ func (c *NexusClient) GetFilesInDirectory(repository string, dirPath string) ([]
 
 // DeleteFile deletes a file from Nexus repository
 func (c *NexusClient) DeleteFile(repository string, filePath string) error {
-	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, filePath)
+	fileURL := c.repositoryURL(repository, filePath)
 
 	if c.DryRun {
 		c.Logf("File '%s' planned for deletion from %s", filePath, fileURL)
@@ -261,7 +274,7 @@ func (c *NexusClient) DownloadFile(repository string, filePath string, destPath 
 
 // UploadFile uploads a file to Nexus repository
 func (c *NexusClient) UploadFile(repository string, filePath string, destPath string) error {
-	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, destPath)
+	fileURL := c.repositoryURL(repository, destPath)
 
 	if c.DryRun {
 		c.Logf("File '%s' planned for pushing to %s", filePath, fileURL)
@@ -444,7 +457,7 @@ func (c *NexusClient) ListRepositories() ([]Repository, error) {
 
 // FileExists checks if a file exists in the Nexus repository
 func (c *NexusClient) FileExists(repository string, filePath string) (bool, error) {
-	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, filePath)
+	fileURL := c.repositoryURL(repository, filePath)
 
 	resp, err := c.makeRequest("HEAD", fileURL, nil)
 	if err != nil {
@@ -457,7 +470,7 @@ func (c *NexusClient) FileExists(repository string, filePath string) (bool, erro
 
 // GetFileSize gets the size of a file from the Nexus repository
 func (c *NexusClient) GetFileSize(repository string, filePath string) (int64, error) {
-	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, filePath)
+	fileURL := c.repositoryURL(repository, filePath)
 
 	resp, err := c.makeRequest("HEAD", fileURL, nil)
 	if err != nil {
@@ -504,7 +517,7 @@ func (c *NexusClient) DownloadToBuffer(repository string, filePath string) ([]by
 
 // UploadFromBuffer uploads file content from memory
 func (c *NexusClient) UploadFromBuffer(repository string, destPath string, content []byte) error {
-	fileURL := fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, destPath)
+	fileURL := c.repositoryURL(repository, destPath)
 
 	if c.DryRun {
 		c.Logf("File planned for pushing to %s", fileURL)
