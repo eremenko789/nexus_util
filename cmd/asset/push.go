@@ -8,6 +8,7 @@ import (
 
 	"nexus-util/config"
 	"nexus-util/nexus"
+
 	"github.com/spf13/cobra"
 )
 
@@ -65,8 +66,14 @@ func runPush(cmd *cobra.Command, args []string) error {
 	// Create Nexus client
 	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
+	return runPushWithClient(client, args, repository, destination, relative, quiet, cfg.GetNexusAddress())
+}
+
+// runPushWithClient performs the actual push operation with provided client
+// This function is extracted for testability - it can be called with mock clients in tests
+func runPushWithClient(client nexus.Client, paths []string, repository, destination string, relative, quiet bool, nexusAddress string) error {
 	// Process each path
-	for _, path := range args {
+	for _, path := range paths {
 		client.Logf("Process path '%s'", path)
 
 		// Check if path exists
@@ -113,7 +120,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		linkDest = "."
 	}
 	linkDest = strings.ReplaceAll(linkDest, "/", "%2F")
-	linkURL := fmt.Sprintf("%s/#browse/browse:%s:%s", cfg.GetNexusAddress(), repository, linkDest)
+	linkURL := fmt.Sprintf("%s/#browse/browse:%s:%s", nexusAddress, repository, linkDest)
 	fmt.Println(linkURL)
 
 	if !quiet {
@@ -122,4 +129,3 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-

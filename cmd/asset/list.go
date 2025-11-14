@@ -62,6 +62,12 @@ func runList(cmd *cobra.Command, args []string) error {
 	// Create Nexus client
 	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
+	return runListWithClient(client, repository, subdir, dryRun, quiet)
+}
+
+// runListWithClient performs the actual list operation with provided client
+// This function is extracted for testability - it can be called with mock clients in tests
+func runListWithClient(client nexus.Client, repository, subdir string, dryRun, quiet bool) error {
 	// Get files in directory
 	files, err := client.GetFilesInDirectory(repository, subdir)
 	if err != nil {

@@ -33,22 +33,40 @@ type NexusClient struct {
 	BaseURL    string
 	Username   string
 	Password   string
-	HTTPClient *http.Client
+	HTTPClient HTTPClient
+	FileSystem FileSystem
 	Quiet      bool
 	DryRun     bool
 }
 
-// NewNexusClient creates a new Nexus client
+// NewNexusClient creates a new Nexus client with default dependencies
 func NewNexusClient(baseURL, username, password string, quiet, dryRun bool) *NexusClient {
+	return NewNexusClientWithDeps(baseURL, username, password, quiet, dryRun, nil, nil)
+}
+
+// NewNexusClientWithDeps creates a new Nexus client with custom dependencies
+// This is useful for testing with mocks
+func NewNexusClientWithDeps(baseURL, username, password string, quiet, dryRun bool, httpClient HTTPClient, fileSystem FileSystem) *NexusClient {
 	// Remove trailing slash from baseURL
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	baseURL = strings.TrimSuffix(baseURL, "\\")
+
+	// Use provided HTTP client or create default
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: httpTimeout}
+	}
+
+	// Use provided file system or create default
+	if fileSystem == nil {
+		fileSystem = &RealFileSystem{}
+	}
 
 	return &NexusClient{
 		BaseURL:    baseURL,
 		Username:   username,
 		Password:   password,
-		HTTPClient: &http.Client{Timeout: httpTimeout},
+		HTTPClient: httpClient,
+		FileSystem: fileSystem,
 		Quiet:      quiet,
 		DryRun:     dryRun,
 	}
@@ -215,7 +233,7 @@ func (c *NexusClient) DownloadFile(repository string, filePath string, destPath 
 	// Create destination directory if it doesn't exist
 	if c.DryRun {
 		c.Logf("Directory '%s' planned for creation", filepath.Dir(destPath))
-	} else if err := os.MkdirAll(filepath.Dir(destPath), dirPerm); err != nil {
+	} else if err := c.FileSystem.MkdirAll(filepath.Dir(destPath), dirPerm); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
@@ -243,7 +261,7 @@ func (c *NexusClient) DownloadFile(repository string, filePath string, destPath 
 	}
 
 	// Create destination file
-	file, err := os.Create(destPath)
+	file, err := c.FileSystem.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
@@ -271,7 +289,7 @@ func (c *NexusClient) UploadFile(repository string, filePath string, destPath st
 	c.Logf("File '%s' will be pushed as %s...", filePath, fileURL)
 
 	// Read file content
-	file, err := os.Open(filePath)
+	file, err := c.FileSystem.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
@@ -332,7 +350,7 @@ func (c *NexusClient) UploadDirectory(repository string, dirPath string, relativ
 		return c.UploadFile(repository, path, destPath)
 	}
 
-	return filepath.Walk(dirPath, uploadFunc)
+	return c.FileSystem.Walk(dirPath, uploadFunc)
 }
 
 // DownloadFileWithPath downloads a file from Nexus repository with custom destination path
@@ -529,7 +547,7 @@ func (c *NexusClient) UploadFromBuffer(repository string, destPath string, conte
 }
 
 // TransferFile transfers a file between two Nexus servers
-func (c *NexusClient) TransferFile(target *NexusClient, sourceRepo string, targetRepo string, filePath string, skipIfExists bool) error {
+func (c *NexusClient) TransferFile(target Client, sourceRepo string, targetRepo string, filePath string, skipIfExists bool) error {
 	// Download from source
 	c.Logf("Downloading '%s' from %s...", filePath, c.BaseURL)
 	content, err := c.DownloadToBuffer(sourceRepo, filePath)
@@ -538,10 +556,15 @@ func (c *NexusClient) TransferFile(target *NexusClient, sourceRepo string, targe
 	}
 
 	// Upload to target
-	c.Logf("Uploading '%s' to %s...", filePath, target.BaseURL)
+	c.Logf("Uploading '%s' to %s...", filePath, target.GetBaseURL())
 	if err := target.UploadFromBuffer(targetRepo, filePath, content); err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
 	}
 
 	return nil
+}
+
+// GetBaseURL returns the base URL of the Nexus server
+func (c *NexusClient) GetBaseURL() string {
+	return c.BaseURL
 }

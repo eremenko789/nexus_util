@@ -73,7 +73,7 @@ build-darwin-arm64:
 .PHONY: test
 test:
 	@echo "Running tests..."
-	go test -v ./...
+	go test -v ./... --cover
 
 # Lint
 .PHONY: lint

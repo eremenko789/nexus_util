@@ -46,3 +46,9 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Test coverage
+coverage.txt
+coverage.html
+coverage.out
+coverage_sync

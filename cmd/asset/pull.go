@@ -7,6 +7,7 @@ import (
 
 	"nexus-util/config"
 	"nexus-util/nexus"
+
 	"github.com/spf13/cobra"
 )
 
@@ -81,8 +82,14 @@ func runPull(cmd *cobra.Command, args []string) error {
 	// Create Nexus client
 	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
+	return runPullWithClient(client, args, repository, destination, root, saveStructure, quiet)
+}
+
+// runPullWithClient performs the actual pull operation with provided client
+// This function is extracted for testability - it can be called with mock clients in tests
+func runPullWithClient(client nexus.Client, sources []string, repository, destination, root string, saveStructure, quiet bool) error {
 	// Process each source
-	for _, source := range args {
+	for _, source := range sources {
 		client.Logf("Process source '%s'", source)
 
 		// Determine if it's a directory (ends with /)
@@ -109,4 +116,3 @@ func runPull(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-

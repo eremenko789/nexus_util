@@ -6,6 +6,7 @@ import (
 
 	"nexus-util/config"
 	"nexus-util/nexus"
+
 	"github.com/spf13/cobra"
 )
 
@@ -56,8 +57,14 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	// Create Nexus client
 	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
+	return runDeleteWithClient(client, args, repository, quiet, cfg.GetNexusAddress())
+}
+
+// runDeleteWithClient performs the actual delete operation with provided client
+// This function is extracted for testability - it can be called with mock clients in tests
+func runDeleteWithClient(client nexus.Client, paths []string, repository string, quiet bool, nexusAddress string) error {
 	// Process each path
-	for _, path := range args {
+	for _, path := range paths {
 		client.Logf("Process path '%s'", path)
 
 		// Determine if it's a directory (ends with /)
@@ -77,7 +84,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print browse URL
-	linkURL := fmt.Sprintf("%s/#browse/browse:%s", cfg.GetNexusAddress(), repository)
+	linkURL := fmt.Sprintf("%s/#browse/browse:%s", nexusAddress, repository)
 	fmt.Println(linkURL)
 
 	if !quiet {
@@ -86,4 +93,3 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-

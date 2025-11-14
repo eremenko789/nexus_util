@@ -7,6 +7,7 @@ import (
 
 	"nexus-util/config"
 	"nexus-util/nexus"
+
 	"github.com/spf13/cobra"
 )
 
@@ -63,6 +64,12 @@ func runList(cmd *cobra.Command, args []string) error {
 	// Create Nexus client (repository not needed for listing)
 	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
 
+	return runListWithClient(client, args)
+}
+
+// runListWithClient performs the actual list operation with provided client
+// This function is extracted for testability - it can be called with mock clients in tests
+func runListWithClient(client nexus.Client, args []string) error {
 	// Debug: output args
 	client.Logf("List command args: %v", args)
 
@@ -89,7 +96,7 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	// Print repositories
 	for _, repo := range repositories {
-		browseUrl := client.BaseURL + "/#browse/browse:" + repo.Name
+		browseUrl := client.GetBaseURL() + "/#browse/browse:" + repo.Name
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 			repo.Name,
 			repo.Format,
@@ -103,4 +110,3 @@ func runList(cmd *cobra.Command, args []string) error {
 func init() {
 	RepoCmd.AddCommand(RepoLsCmd)
 }
-

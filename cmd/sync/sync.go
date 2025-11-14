@@ -5,6 +5,7 @@ import (
 
 	"nexus-util/config"
 	"nexus-util/nexus"
+
 	"github.com/spf13/cobra"
 )
 
@@ -124,8 +125,14 @@ func runSync(cmd *cobra.Command, args []string) error {
 	sourceClient := nexus.NewNexusClient(finalSourceAddress, sourceUsername, sourcePass, quiet, dryRun)
 	targetClient := nexus.NewNexusClient(finalTargetAddress, targetUsername, targetPass, quiet, dryRun)
 
+	return runSyncWithClients(sourceClient, targetClient, sourceRepo, targetRepo, finalSourceAddress, dryRun, skipExisting, showProgress)
+}
+
+// runSyncWithClients performs the actual sync operation with provided clients
+// This function is extracted for testability - it can be called with mock clients in tests
+func runSyncWithClients(sourceClient nexus.Client, targetClient nexus.Client, sourceRepo, targetRepo, sourceAddress string, dryRun, skipExisting, showProgress bool) error {
 	// Get all files from source repository
-	fmt.Printf("Scanning source repository '%s' on %s...\n", sourceRepo, finalSourceAddress)
+	fmt.Printf("Scanning source repository '%s' on %s...\n", sourceRepo, sourceAddress)
 	sourceFiles, err := sourceClient.GetFilesInDirectory(sourceRepo, "")
 	if err != nil {
 		return fmt.Errorf("failed to get files from source repository: %w", err)
@@ -197,4 +204,3 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
