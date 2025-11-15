@@ -25,7 +25,9 @@ const (
 	filePerm = 0o600
 
 	// HTTP client timeout
-	httpTimeout = 30 * time.Second
+	httpTimeout = 10 * time.Minute
+	// Download timeout for large files
+	downloadTimeout = 30 * time.Minute
 )
 
 // NexusClient represents a client for Nexus OSS API
@@ -39,11 +41,7 @@ type NexusClient struct {
 }
 
 func encodeRepositoryPath(path string) string {
-	segments := strings.Split(path, "/")
-	for i, segment := range segments {
-		segments[i] = url.PathEscape(segment)
-	}
-	return strings.Join(segments, "/")
+	return strings.ReplaceAll(path, " ", "%20")
 }
 
 func (c *NexusClient) repositoryURL(repository, assetPath string) string {
@@ -76,7 +74,12 @@ func (c *NexusClient) Logf(format string, args ...interface{}) {
 
 // makeRequest makes an HTTP request with basic auth
 func (c *NexusClient) makeRequest(method, url string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
+	return c.makeRequestWithContext(context.Background(), method, url, body)
+}
+
+// makeRequestWithContext makes an HTTP request with basic auth and custom context
+func (c *NexusClient) makeRequestWithContext(ctx context.Context, method, url string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +99,8 @@ type SearchAssetsResponse struct {
 
 // Asset represents a file in Nexus repository
 type Asset struct {
-	Path string `json:"path"`
+	Path        string `json:"path"`
+	DownloadUrl string `json:"downloadUrl"`
 }
 
 // Repository represents a Nexus repository
@@ -108,8 +112,8 @@ type Repository struct {
 }
 
 // GetFilesInDirectory gets all files in a directory recursively
-func (c *NexusClient) GetFilesInDirectory(repository string, dirPath string) ([]string, error) {
-	var allFiles []string
+func (c *NexusClient) GetFilesInDirectory(repository string, dirPath string) ([]Asset, error) {
+	var allFiles []Asset
 	continuationToken := ""
 
 	for {
@@ -149,7 +153,7 @@ func (c *NexusClient) GetFilesInDirectory(repository string, dirPath string) ([]
 		// Filter files that start with the directory path
 		for _, item := range searchResp.Items {
 			if dirPath == "" || strings.HasPrefix(item.Path, dirPath) {
-				allFiles = append(allFiles, item.Path)
+				allFiles = append(allFiles, item)
 			}
 		}
 
@@ -212,14 +216,41 @@ func (c *NexusClient) DeleteDirectory(repository string, dirPath string) error {
 	}
 
 	deletedCount := 0
-	for _, filePath := range files {
-		if err := c.DeleteFile(repository, filePath); err != nil {
-			return fmt.Errorf("failed to delete file %s: %w", filePath, err)
+	for _, file := range files {
+		if err := c.DeleteFile(repository, file.Path); err != nil {
+			return fmt.Errorf("failed to delete file %s: %w", file.Path, err)
 		}
 		deletedCount++
 	}
 
 	c.Logf("Directory '%s' deletion completed. %d files processed", dirPath, deletedCount)
+	return nil
+}
+
+// DownloadFileByUrl downloads a file from Nexus repository using a direct download URL
+func (c *NexusClient) DownloadFileByUrl(downloadURL string, destPath string) error {
+	c.Logf("REST API: %s", downloadURL)
+	c.Logf("DESTINATION: %s", destPath)
+
+	fileContent, err := c.DownloadToBuffer(downloadURL)
+	if err != nil {
+		return fmt.Errorf("failed to download file: %w", err)
+	}
+
+	// Create destination file
+	file, err := os.Create(destPath)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer file.Close()
+
+	// Write fileContent ([]byte) to file
+	_, err = file.Write(fileContent)
+	if err != nil {
+		return fmt.Errorf("failed to write file content: %w", err)
+	}
+
+	c.Logf("Success file download...")
 	return nil
 }
 
@@ -232,44 +263,38 @@ func (c *NexusClient) DownloadFile(repository string, filePath string, destPath 
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
-	// Build download URL
-	encodedPath := url.QueryEscape(filePath)
-	downloadURL := fmt.Sprintf("%s/service/rest/v1/search/assets/download?repository=%s&name=%s",
-		c.BaseURL, repository, encodedPath)
+	// Build search URL to get downloadUrl
+	searchURL := fmt.Sprintf("%s/service/rest/v1/search/assets?repository=%s&name=%s",
+		c.BaseURL, repository, url.QueryEscape(filePath))
 
-	c.Logf("REST API: %s", downloadURL)
-	c.Logf("DESTINATION: %s", destPath)
+	c.Logf("REST API request: %s", searchURL)
 
-	if c.DryRun {
-		c.Logf("File '%s' planned for download to %s", filePath, destPath)
-		return nil
-	}
-
-	resp, err := c.makeRequest("GET", downloadURL, nil)
+	resp, err := c.makeRequest("GET", searchURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to download file: %w", err)
+		return fmt.Errorf("failed to search assets: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != httpStatusOK {
-		return fmt.Errorf("download failed with status %d", resp.StatusCode)
+		return fmt.Errorf("search request failed with status %d", resp.StatusCode)
 	}
 
-	// Create destination file
-	file, err := os.Create(destPath)
-	if err != nil {
-		return fmt.Errorf("failed to create destination file: %w", err)
-	}
-	defer file.Close()
-
-	// Copy content
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to write file content: %w", err)
+	var searchResp SearchAssetsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&searchResp); err != nil {
+		return fmt.Errorf("failed to decode search response: %w", err)
 	}
 
-	c.Logf("Success file download...")
-	return nil
+	if len(searchResp.Items) == 0 {
+		return fmt.Errorf("file '%s' not found in repository", filePath)
+	}
+
+	// Get downloadUrl from the first item
+	downloadURL := searchResp.Items[0].DownloadUrl
+	if downloadURL == "" {
+		return fmt.Errorf("downloadUrl not found for file '%s'", filePath)
+	}
+
+	return c.DownloadFileByUrl(downloadURL, destPath)
 }
 
 // UploadFile uploads a file to Nexus repository
@@ -390,18 +415,18 @@ func (c *NexusClient) DownloadDirectoryWithPath(repository string, dirPath strin
 
 	// Download each file
 	for _, file := range files {
-		c.Logf("file '%s' searched", file)
+		c.Logf("file '%s' searched", file.Path)
 
 		// Calculate relative path
 		var relPath string
 		if root != "" {
-			relPath = strings.TrimPrefix(file, root+"/")
+			relPath = strings.TrimPrefix(file.Path, root+"/")
 		} else {
-			relPath = file
+			relPath = file.Path
 		}
 
 		// Get the filename from the variable 'file', which may contain a relative path
-		fileName := filepath.Base(file)
+		fileName := filepath.Base(file.Path)
 		c.Logf("File name: %s", fileName)
 
 		// Build destination path
@@ -414,8 +439,8 @@ func (c *NexusClient) DownloadDirectoryWithPath(repository string, dirPath strin
 		c.Logf("Destination path: %s", destPath)
 
 		// Download the file
-		if err := c.DownloadFile(repository, file, destPath); err != nil {
-			return fmt.Errorf("failed to download file %s: %w", file, err)
+		if err := c.DownloadFileByUrl(file.DownloadUrl, destPath); err != nil {
+			return fmt.Errorf("failed to download file %s: %w", file.Path, err)
 		}
 	}
 
@@ -491,19 +516,19 @@ func (c *NexusClient) GetFileSize(repository string, filePath string) (int64, er
 }
 
 // DownloadToBuffer downloads a file into memory
-func (c *NexusClient) DownloadToBuffer(repository string, filePath string) ([]byte, error) {
-	// Build download URL
-	encodedPath := url.QueryEscape(filePath)
-	downloadURL := fmt.Sprintf("%s/service/rest/v1/search/assets/download?repository=%s&name=%s",
-		c.BaseURL, repository, encodedPath)
-
+func (c *NexusClient) DownloadToBuffer(downloadURL string) ([]byte, error) {
 	c.Logf("Downloading to buffer: %s", downloadURL)
 
 	if c.DryRun {
 		c.Logf("Dry run: Would download file from %s", downloadURL)
 		return nil, nil
 	}
-	resp, err := c.makeRequest("GET", downloadURL, nil)
+
+	// Use extended timeout context for large file downloads
+	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+	defer cancel()
+
+	resp, err := c.makeRequestWithContext(ctx, "GET", downloadURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download file: %w", err)
 	}
@@ -542,17 +567,17 @@ func (c *NexusClient) UploadFromBuffer(repository string, destPath string, conte
 }
 
 // TransferFile transfers a file between two Nexus servers
-func (c *NexusClient) TransferFile(target *NexusClient, sourceRepo string, targetRepo string, filePath string, skipIfExists bool) error {
+func (c *NexusClient) TransferFile(target *NexusClient, sourceRepo string, targetRepo string, fileAsset Asset, skipIfExists bool) error {
 	// Download from source
-	c.Logf("Downloading '%s' from %s...", filePath, c.BaseURL)
-	content, err := c.DownloadToBuffer(sourceRepo, filePath)
+	c.Logf("Downloading '%s' from %s...", fileAsset.Path, c.BaseURL)
+	content, err := c.DownloadToBuffer(fileAsset.DownloadUrl)
 	if err != nil {
 		return fmt.Errorf("failed to download file: %w", err)
 	}
 
 	// Upload to target
-	c.Logf("Uploading '%s' to %s...", filePath, target.BaseURL)
-	if err := target.UploadFromBuffer(targetRepo, filePath, content); err != nil {
+	c.Logf("Uploading '%s' to %s...", fileAsset.Path, target.BaseURL)
+	if err := target.UploadFromBuffer(targetRepo, fileAsset.Path, content); err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
 	}
 
