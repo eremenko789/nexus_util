@@ -67,12 +67,20 @@ func TestEncodeRepositoryPathWithSpaces(t *testing.T) {
 }
 
 func TestRepositoryURLWithSpaces(t *testing.T) {
-	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, false)
+	client := NewNexusClient("http://nexus.redkit-lab.ru:8081", "testuser", "testpass", false, false)
 
-	got := client.repositoryURL("myrepo", "dir/with space/file name.txt")
-	expected := "http://test-nexus.example.com/repository/myrepo/dir/with%20space/file%20name.txt"
+	// got := client.repositoryURL("myrepo", "dir/with space/file name.txt")
+	// expected := "http://test-nexus.example.com/repository/myrepo/dir/with%20space/file%20name.txt"
+
+	// if got != expected {
+	// 	t.Fatalf("Expected repository URL '%s', got '%s'", expected, got)
+	// }
+
+	got := client.repositoryURL("scada", "2507/rc/192/linux/install_logs/info_Alt Linux (Workstation)_2861.json")
+	expected := "http://nexus.redkit-lab.ru:8081/repository/scada/2507/rc/192/linux/install_logs/info_Alt%20Linux%20(Workstation)_2861.json"
 
 	if got != expected {
 		t.Fatalf("Expected repository URL '%s', got '%s'", expected, got)
 	}
+
 }

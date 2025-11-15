@@ -5,6 +5,7 @@ import (
 
 	"nexus-util/config"
 	"nexus-util/nexus"
+
 	"github.com/spf13/cobra"
 )
 
@@ -142,9 +143,9 @@ func runSync(cmd *cobra.Command, args []string) error {
 	if !dryRun {
 		// Find the largest file
 		maxSize := int64(0)
-		var largestFile string
+		var largestFile nexus.Asset
 		for _, file := range sourceFiles {
-			size, err := sourceClient.GetFileSize(sourceRepo, file)
+			size, err := sourceClient.GetFileSize(sourceRepo, file.Path)
 			if err != nil {
 				// Log but continue
 				sourceClient.Logf("Warning: failed to get size for %s: %v", file, err)
@@ -157,7 +158,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		}
 
 		if maxSize > 0 {
-			fmt.Printf("Largest file: %s (%d bytes)\n", largestFile, maxSize)
+			fmt.Printf("Largest file: %s (%d bytes)\n", largestFile.Path, maxSize)
 			fmt.Println("Disk space check passed")
 		}
 	}
@@ -168,12 +169,12 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	for i, file := range sourceFiles {
 		if showProgress {
-			fmt.Printf("[%d/%d] Processing: %s\n", i+1, len(sourceFiles), file)
+			fmt.Printf("[%d/%d] Processing: %s\n", i+1, len(sourceFiles), file.Path)
 		}
 
 		// Check if file should be skipped
 		if skipExisting {
-			exists, err := targetClient.FileExists(targetRepo, file)
+			exists, err := targetClient.FileExists(targetRepo, file.Path)
 			if err != nil {
 				sourceClient.Logf("Warning: failed to check if file exists in target: %v", err)
 			} else if exists {
@@ -197,4 +198,3 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
