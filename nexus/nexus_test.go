@@ -1,11 +1,12 @@
 package nexus
 
 import (
+	"net/http"
 	"testing"
 )
 
 func TestNexusClientCreation(t *testing.T) {
-	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, false)
+	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, false, false)
 
 	if client == nil {
 		t.Fatal("Expected client to be created, got nil")
@@ -26,7 +27,7 @@ func TestNexusClientCreation(t *testing.T) {
 
 func TestNexusClientWithTrailingSlash(t *testing.T) {
 	// Test that trailing slashes are removed
-	client := NewNexusClient("http://test-nexus.example.com/", "testuser", "testpass", false, false)
+	client := NewNexusClient("http://test-nexus.example.com/", "testuser", "testpass", false, false, false)
 
 	if client.BaseURL != "http://test-nexus.example.com" {
 		t.Errorf("Expected BaseURL without trailing slash 'http://test-nexus.example.com', got '%s'", client.BaseURL)
@@ -34,7 +35,7 @@ func TestNexusClientWithTrailingSlash(t *testing.T) {
 }
 
 func TestNexusClientQuietMode(t *testing.T) {
-	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", true, false)
+	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", true, false, false)
 
 	if !client.Quiet {
 		t.Error("Expected Quiet mode to be enabled")
@@ -42,7 +43,7 @@ func TestNexusClientQuietMode(t *testing.T) {
 }
 
 func TestNexusClientDryRunMode(t *testing.T) {
-	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, true)
+	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, true, false)
 
 	if !client.DryRun {
 		t.Error("Expected DryRun mode to be enabled")
@@ -50,10 +51,36 @@ func TestNexusClientDryRunMode(t *testing.T) {
 }
 
 func TestNexusClientHTTPClient(t *testing.T) {
-	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, false)
+	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, false, false)
 
 	if client.HTTPClient == nil {
 		t.Error("Expected HTTPClient to be initialized")
+	}
+}
+
+func TestNexusClientInsecureMode(t *testing.T) {
+	client := NewNexusClient("http://test-nexus.example.com", "testuser", "testpass", false, false, true)
+
+	if !client.Insecure {
+		t.Error("Expected Insecure mode to be enabled")
+	}
+
+	// Check that HTTP client has insecure TLS config
+	if client.HTTPClient.Transport == nil {
+		t.Error("Expected Transport to be set when insecure mode is enabled")
+	}
+
+	transport, ok := client.HTTPClient.Transport.(*http.Transport)
+	if !ok {
+		t.Error("Expected Transport to be *http.Transport")
+	}
+
+	if transport.TLSClientConfig == nil {
+		t.Error("Expected TLSClientConfig to be set")
+	}
+
+	if !transport.TLSClientConfig.InsecureSkipVerify {
+		t.Error("Expected InsecureSkipVerify to be true")
 	}
 }
 
@@ -67,7 +94,7 @@ func TestEncodeRepositoryPathWithSpaces(t *testing.T) {
 }
 
 func TestRepositoryURLWithSpaces(t *testing.T) {
-	client := NewNexusClient("http://nexus.redkit-lab.ru:8081", "testuser", "testpass", false, false)
+	client := NewNexusClient("http://nexus.redkit-lab.ru:8081", "testuser", "testpass", false, false, false)
 
 	// got := client.repositoryURL("myrepo", "dir/with space/file name.txt")
 	// expected := "http://test-nexus.example.com/repository/myrepo/dir/with%20space/file%20name.txt"

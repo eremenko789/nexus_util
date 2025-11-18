@@ -37,6 +37,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	configPath, _ := cmd.Flags().GetString("config")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	dryRun, _ := cmd.Flags().GetBool("dry")
+	insecure, _ := cmd.Flags().GetBool("insecure")
 
 	// Get subdir argument (optional)
 	var subdir string
@@ -60,7 +61,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create Nexus client
-	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
+	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun, insecure)
 
 	// Get files in directory
 	files, err := client.GetFilesInDirectory(repository, subdir)
