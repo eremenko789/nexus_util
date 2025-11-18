@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"nexus-util/cmd/asset"
+	"nexus-util/cmd/blob"
 	initcmd "nexus-util/cmd/init"
 	"nexus-util/cmd/repo"
 	"nexus-util/cmd/sync"
@@ -46,12 +47,14 @@ Configuration:
 	rootCmd.PersistentFlags().StringP("config", "c", "", "Path to configuration file (default: ~/.nexus-util.yaml)")
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Quiet mode - minimal output")
 	rootCmd.PersistentFlags().Bool("dry", false, "Dry run - show what would be done without actually doing it")
+	rootCmd.PersistentFlags().Bool("insecure", false, "Skip TLS/SSL certificate verification")
 
 	// Initialize commands
 	setupCommands()
 
 	// Add commands
 	rootCmd.AddCommand(asset.AssetCmd)
+	rootCmd.AddCommand(blob.BlobCmd)
 	rootCmd.AddCommand(initcmd.InitCmd)
 	rootCmd.AddCommand(repo.RepoCmd)
 	rootCmd.AddCommand(sync.SyncCmd)

@@ -3,6 +3,7 @@ package nexus
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,9 +26,9 @@ const (
 	filePerm = 0o600
 
 	// HTTP client timeout
-	httpTimeout = 10 * time.Minute
+	httpTimeout = 30 * time.Minute
 	// Download timeout for large files
-	downloadTimeout = 30 * time.Minute
+	downloadTimeout = 60 * time.Minute
 )
 
 // NexusClient represents a client for Nexus OSS API
@@ -38,10 +39,13 @@ type NexusClient struct {
 	HTTPClient *http.Client
 	Quiet      bool
 	DryRun     bool
+	Insecure   bool
 }
 
 func encodeRepositoryPath(path string) string {
-	return strings.ReplaceAll(path, " ", "%20")
+	without_spaces := strings.ReplaceAll(path, " ", "%20")
+	without_sq_brackets := strings.ReplaceAll(strings.ReplaceAll(without_spaces, "[", "%5B"), "]", "%5D")
+	return without_sq_brackets
 }
 
 func (c *NexusClient) repositoryURL(repository, assetPath string) string {
@@ -50,18 +54,30 @@ func (c *NexusClient) repositoryURL(repository, assetPath string) string {
 }
 
 // NewNexusClient creates a new Nexus client
-func NewNexusClient(baseURL, username, password string, quiet, dryRun bool) *NexusClient {
+func NewNexusClient(baseURL, username, password string, quiet, dryRun, insecure bool) *NexusClient {
 	// Remove trailing slash from baseURL
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	baseURL = strings.TrimSuffix(baseURL, "\\")
+
+	// Create HTTP client with optional insecure TLS
+	httpClient := &http.Client{Timeout: httpTimeout}
+	if insecure {
+		transport := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+		httpClient.Transport = transport
+	}
 
 	return &NexusClient{
 		BaseURL:    baseURL,
 		Username:   username,
 		Password:   password,
-		HTTPClient: &http.Client{Timeout: httpTimeout},
+		HTTPClient: httpClient,
 		Quiet:      quiet,
 		DryRun:     dryRun,
+		Insecure:   insecure,
 	}
 }
 
@@ -88,6 +104,11 @@ func (c *NexusClient) makeRequestWithContext(ctx context.Context, method, url st
 		req.SetBasicAuth(c.Username, c.Password)
 	}
 
+	// Set Content-Type for POST/PUT requests with body
+	if body != nil && (method == "POST" || method == "PUT") {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
 	return c.HTTPClient.Do(req)
 }
 
@@ -109,6 +130,31 @@ type Repository struct {
 	Format string `json:"format"`
 	Type   string `json:"type"`
 	URL    string `json:"url"`
+}
+
+// BlobStore represents a Nexus blob store
+type BlobStore struct {
+	Name                  string     `json:"name"`
+	Type                  string     `json:"type"`
+	AvailableSpaceInBytes uint64     `json:"availableSpaceInBytes"`
+	TotalSizeInBytes      uint64     `json:"totalSizeInBytes"`
+	BlobCount             uint64     `json:"blobCount"`
+	Path                  string     `json:"path,omitempty"`
+	SoftQuota             *SoftQuota `json:"softQuota,omitempty"`
+}
+
+// BlobStoreConfig represents configuration for creating a blob store
+type BlobStoreConfig struct {
+	Name      string     `json:"name"`
+	Type      string     `json:"type"`
+	Path      string     `json:"path,omitempty"`
+	SoftQuota *SoftQuota `json:"softQuota,omitempty"`
+}
+
+// SoftQuota represents soft quota configuration
+type SoftQuota struct {
+	Limit uint64 `json:"limit"`
+	Type  string `json:"type"`
 }
 
 // GetFilesInDirectory gets all files in a directory recursively
@@ -235,6 +281,13 @@ func (c *NexusClient) DownloadFileByUrl(downloadURL string, destPath string) err
 	fileContent, err := c.DownloadToBuffer(downloadURL)
 	if err != nil {
 		return fmt.Errorf("failed to download file: %w", err)
+	}
+
+	// Create destination directory if it doesn't exist
+	if c.DryRun {
+		c.Logf("Directory '%s' planned for creation", filepath.Dir(destPath))
+	} else if err := os.MkdirAll(filepath.Dir(destPath), dirPerm); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
 	// Create destination file
@@ -579,6 +632,140 @@ func (c *NexusClient) TransferFile(target *NexusClient, sourceRepo string, targe
 	c.Logf("Uploading '%s' to %s...", fileAsset.Path, target.BaseURL)
 	if err := target.UploadFromBuffer(targetRepo, fileAsset.Path, content); err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
+	}
+
+	return nil
+}
+
+// ListBlobStores lists all blob stores configured in the Nexus instance
+func (c *NexusClient) ListBlobStores() ([]BlobStore, error) {
+	// Build blob stores API URL
+	blobStoresURL := fmt.Sprintf("%s/service/rest/v1/blobstores", c.BaseURL)
+
+	c.Logf("REST API request: %s", blobStoresURL)
+
+	if c.DryRun {
+		c.Logf("Dry run: Would list blob stores from %s", blobStoresURL)
+		// Return empty slice for dry run
+		return []BlobStore{}, nil
+	}
+
+	resp, err := c.makeRequest("GET", blobStoresURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list blob stores: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != httpStatusOK {
+		return nil, fmt.Errorf("blob stores request failed with status %d", resp.StatusCode)
+	}
+
+	var blobStores []BlobStore
+	if err := json.NewDecoder(resp.Body).Decode(&blobStores); err != nil {
+		return nil, fmt.Errorf("failed to decode blob stores response: %w", err)
+	}
+
+	c.Logf("Found %d blob stores", len(blobStores))
+	return blobStores, nil
+}
+
+// GetBlobStore gets detailed information about a specific blob store
+func (c *NexusClient) GetBlobStore(name string) (*BlobStore, error) {
+	// First, get the blob store type using ListBlobStores
+	blobStores, err := c.ListBlobStores()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list blob stores: %w", err)
+	}
+
+	// Find the blob store by name
+	var blobStoreType string
+	var found bool
+	for _, bs := range blobStores {
+		if bs.Name == name {
+			blobStoreType = bs.Type
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("blob store '%s' not found", name)
+	}
+
+	// Build blob store API URL based on type (case-insensitive comparison)
+	var blobStoreURL string
+	switch strings.ToLower(blobStoreType) {
+	case "file":
+		blobStoreURL = fmt.Sprintf("%s/service/rest/v1/blobstores/file/%s", c.BaseURL, url.QueryEscape(name))
+	case "s3":
+		blobStoreURL = fmt.Sprintf("%s/service/rest/v1/blobstores/s3/%s", c.BaseURL, url.QueryEscape(name))
+	case "azure":
+		blobStoreURL = fmt.Sprintf("%s/service/rest/v1/blobstores/azure/%s", c.BaseURL, url.QueryEscape(name))
+	default:
+		return nil, fmt.Errorf("unsupported blob store type '%s' for blob store '%s'", blobStoreType, name)
+	}
+
+	c.Logf("REST API request: %s", blobStoreURL)
+
+	if c.DryRun {
+		c.Logf("Dry run: Would get blob store from %s", blobStoreURL)
+		// Return empty blob store for dry run
+		return &BlobStore{Name: name, Type: blobStoreType}, nil
+	}
+
+	resp, err := c.makeRequest("GET", blobStoreURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blob store: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != httpStatusOK {
+		if resp.StatusCode == httpStatusNotFound {
+			return nil, fmt.Errorf("blob store '%s' not found", name)
+		}
+		return nil, fmt.Errorf("blob store request failed with status %d", resp.StatusCode)
+	}
+
+	var blobStore BlobStore
+	if err := json.NewDecoder(resp.Body).Decode(&blobStore); err != nil {
+		return nil, fmt.Errorf("failed to decode blob store response: %w", err)
+	}
+
+	return &blobStore, nil
+}
+
+// CreateBlobStore creates a new blob store in the Nexus instance
+func (c *NexusClient) CreateBlobStore(config BlobStoreConfig) error {
+	// Build blob store API URL
+	blobStoreURL := fmt.Sprintf("%s/service/rest/v1/blobstores/%s", c.BaseURL, url.QueryEscape(config.Type))
+
+	c.Logf("REST API request: %s", blobStoreURL)
+
+	if c.DryRun {
+		c.Logf("Dry run: Would create blob store '%s' of type '%s'", config.Name, config.Type)
+		return nil
+	}
+
+	// Prepare request body
+	requestBody, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal blob store config: %w", err)
+	}
+
+	c.Logf("Creating blob store '%s' of type '%s'...", config.Name, config.Type)
+
+	resp, err := c.makeRequest("POST", blobStoreURL, bytes.NewReader(requestBody))
+	if err != nil {
+		return fmt.Errorf("failed to create blob store: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= httpStatusOK && resp.StatusCode < 300 {
+		c.Logf("Blob store '%s' created successfully", config.Name)
+	} else {
+		// Try to read error message from response
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create blob store (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	return nil

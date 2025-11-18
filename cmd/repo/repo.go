@@ -7,6 +7,7 @@ import (
 
 	"nexus-util/config"
 	"nexus-util/nexus"
+
 	"github.com/spf13/cobra"
 )
 
@@ -42,6 +43,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	password, _ := cmd.Flags().GetString("password")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	dryRun, _ := cmd.Flags().GetBool("dry")
+	insecure, _ := cmd.Flags().GetBool("insecure")
 
 	// Load configuration
 	flags := map[string]interface{}{
@@ -61,7 +63,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create Nexus client (repository not needed for listing)
-	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
+	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun, insecure)
 
 	// Debug: output args
 	client.Logf("List command args: %v", args)
@@ -103,4 +105,3 @@ func runList(cmd *cobra.Command, args []string) error {
 func init() {
 	RepoCmd.AddCommand(RepoLsCmd)
 }
-

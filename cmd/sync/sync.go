@@ -53,6 +53,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	configPath, _ := cmd.Flags().GetString("config")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	dryRun, _ := cmd.Flags().GetBool("dry")
+	insecure, _ := cmd.Flags().GetBool("insecure")
 	skipExisting, _ := cmd.Flags().GetBool("skip-existing")
 	showProgress, _ := cmd.Flags().GetBool("show-progress")
 
@@ -122,8 +123,8 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create clients
-	sourceClient := nexus.NewNexusClient(finalSourceAddress, sourceUsername, sourcePass, quiet, dryRun)
-	targetClient := nexus.NewNexusClient(finalTargetAddress, targetUsername, targetPass, quiet, dryRun)
+	sourceClient := nexus.NewNexusClient(finalSourceAddress, sourceUsername, sourcePass, quiet, dryRun, insecure)
+	targetClient := nexus.NewNexusClient(finalTargetAddress, targetUsername, targetPass, quiet, dryRun, insecure)
 
 	// Get all files from source repository
 	fmt.Printf("Scanning source repository '%s' on %s...\n", sourceRepo, finalSourceAddress)

@@ -6,6 +6,7 @@ import (
 
 	"nexus-util/config"
 	"nexus-util/nexus"
+
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +38,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	configPath, _ := cmd.Flags().GetString("config")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	dryRun, _ := cmd.Flags().GetBool("dry")
+	insecure, _ := cmd.Flags().GetBool("insecure")
 
 	// Load configuration
 	cfg, err := config.LoadConfigWithFlags(configPath, map[string]interface{}{
@@ -54,7 +56,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create Nexus client
-	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun)
+	client := nexus.NewNexusClient(cfg.GetNexusAddress(), cfg.GetUser(), cfg.GetPassword(), quiet, dryRun, insecure)
 
 	// Process each path
 	for _, path := range args {
@@ -86,4 +88,3 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
