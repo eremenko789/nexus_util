@@ -151,3 +151,8 @@ help:
 	@echo "  run            - Run the application"
 	@echo "  release        - Create release packages"
 	@echo "  help           - Show this help"
+
+.PHONY: run-container
+run-container:
+	docker build . -t go_build:latest
+	docker run -it --rm -v $(CURDIR):$(CURDIR) -w $(CURDIR) --entrypoint bash go_build:latest

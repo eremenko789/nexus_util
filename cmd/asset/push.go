@@ -110,17 +110,14 @@ func runPush(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print browse URL
-	linkDest := destination
-	if linkDest == "" {
-		linkDest = "."
-	}
+	linkDest := strings.TrimSuffix(destination, "/")
+
 	linkDest = strings.ReplaceAll(linkDest, "/", "%2F")
 	linkURL := fmt.Sprintf("%s/#browse/browse:%s:%s", cfg.GetNexusAddress(), repository, linkDest)
-	fmt.Println(linkURL)
 
 	if !quiet {
 		fmt.Println("Success!")
+		fmt.Println(linkURL)
 	}
-
 	return nil
 }
