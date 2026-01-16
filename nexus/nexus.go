@@ -161,15 +161,18 @@ type SoftQuota struct {
 func (c *NexusClient) GetFilesInDirectory(repository string, dirPath string) ([]Asset, error) {
 	var allFiles []Asset
 	continuationToken := ""
+	normalizedDirPath := strings.TrimSuffix(dirPath, "/")
+	encodedPath := ""
+	if dirPath != "" {
+		// URL encode the directory path
+		encodedPath = url.QueryEscape(normalizedDirPath + "/")
+	}
 
 	for {
 		// Build search URL
 		searchURL := fmt.Sprintf("%s/service/rest/v1/search/assets?repository=%s", c.BaseURL, repository)
 
 		if dirPath != "" {
-			dirPath = strings.TrimSuffix(dirPath, "/")
-			// URL encode the directory path
-			encodedPath := url.QueryEscape(dirPath + "/")
 			searchURL += "&name=" + encodedPath + "*"
 		}
 
@@ -198,7 +201,7 @@ func (c *NexusClient) GetFilesInDirectory(repository string, dirPath string) ([]
 
 		// Filter files that start with the directory path
 		for _, item := range searchResp.Items {
-			if dirPath == "" || strings.HasPrefix(item.Path, dirPath) {
+			if normalizedDirPath == "" || strings.HasPrefix(item.Path, normalizedDirPath) {
 				allFiles = append(allFiles, item)
 			}
 		}
@@ -210,7 +213,7 @@ func (c *NexusClient) GetFilesInDirectory(repository string, dirPath string) ([]
 		continuationToken = searchResp.ContinuationToken
 	}
 
-	c.Logf("Found %d files in directory '%s'", len(allFiles), dirPath)
+	c.Logf("Found %d files in directory '%s'", len(allFiles), normalizedDirPath)
 	return allFiles, nil
 }
 
