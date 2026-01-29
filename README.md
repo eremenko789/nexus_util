@@ -7,6 +7,7 @@ A unified command-line tool for managing files and directories in Nexus OSS Raw 
 - **Push**: Upload files and directories to Nexus repository
 - **Pull**: Download files and directories from Nexus repository  
 - **Delete**: Remove files and directories from Nexus repository
+- **Diff**: Compare repository contents with another repository or local directory
 - **Sync**: Transfer contents from one Nexus repository to another
 - **Configuration file**: Store connection details in YAML config file
 - **Cross-platform**: Builds for Linux, Windows, macOS, FreeBSD, OpenBSD, NetBSD
@@ -170,6 +171,40 @@ nexus-util sync --source-address http://source.example.com --source-user user1 -
 - `--target-pass`: Target user authentication password
 - `--skip-existing`: Skip files that already exist in target repository
 - `--show-progress`: Show detailed progress for each file
+
+### Diff Command
+
+Compare files by presence and checksum between:
+- Two Nexus repositories (possibly on different servers)
+- One Nexus repository and a local directory
+
+The output is JSON with the following fields:
+- `identical`: Files that exist in both sources and have matching hashes
+- `only_source`: Files that exist only in source
+- `only_target`: Files that exist only in target
+- `different`: Files that exist in both sources but have different hashes
+
+```bash
+# Compare repositories on the same server (uses --address and --repository as source)
+nexus-util asset diff -a http://nexus.example.com -r repo1 --target-repo repo2
+
+# Compare repositories on different servers
+nexus-util asset diff -a http://source.example.com -r repo1 \
+  --target-address http://target.example.com --target-repo repo2 \
+  --target-user user2 --target-pass pass2
+
+# Compare a repository path against a local directory
+nexus-util asset diff -a http://nexus.example.com -r repo1 \
+  --path releases/v1.2.3 --local ./downloads
+```
+
+**Diff-specific flags:**
+- `--target-address`: Target Nexus OSS host address (default: source address)
+- `--target-repo`: Target Nexus repository name
+- `--target-user`: Target user authentication login
+- `--target-pass`: Target user authentication password
+- `--local`: Local directory to compare against source repository
+- `--path`: Repository path to compare (applies to both sources)
 
 ### Init Command
 

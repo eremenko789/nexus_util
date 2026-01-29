@@ -3,9 +3,14 @@ package nexus
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"net/url"
@@ -122,6 +127,7 @@ type SearchAssetsResponse struct {
 type Asset struct {
 	Path        string `json:"path"`
 	DownloadUrl string `json:"downloadUrl"`
+	Checksum    map[string]string `json:"checksum"`
 }
 
 // Repository represents a Nexus repository
@@ -594,6 +600,46 @@ func (c *NexusClient) DownloadToBuffer(downloadURL string) ([]byte, error) {
 		return nil, fmt.Errorf("download failed with status %d", resp.StatusCode)
 	}
 	return io.ReadAll(resp.Body)
+}
+
+func newHashForAlgorithm(algorithm string) (hash.Hash, error) {
+	switch strings.ToLower(algorithm) {
+	case "sha256":
+		return sha256.New(), nil
+	case "sha1":
+		return sha1.New(), nil
+	case "md5":
+		return md5.New(), nil
+	default:
+		return nil, fmt.Errorf("unsupported hash algorithm: %s", algorithm)
+	}
+}
+
+// ComputeHashFromDownloadURL downloads a file and returns its hash.
+func (c *NexusClient) ComputeHashFromDownloadURL(downloadURL string, algorithm string) (string, error) {
+	hasher, err := newHashForAlgorithm(algorithm)
+	if err != nil {
+		return "", err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+	defer cancel()
+
+	resp, err := c.makeRequestWithContext(ctx, "GET", downloadURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != httpStatusOK {
+		return "", fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+
+	if _, err := io.Copy(hasher, resp.Body); err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // UploadFromBuffer uploads file content from memory

@@ -77,6 +77,7 @@ func setupCommands() {
 	asset.AssetCmd.AddCommand(asset.PullCmd)
 	asset.AssetCmd.AddCommand(asset.DeleteCmd)
 	asset.AssetCmd.AddCommand(asset.ListCmd)
+	asset.AssetCmd.AddCommand(asset.DiffCmd)
 
 	// Push command flags
 	asset.PushCmd.Flags().StringP("destination", "d", "", "Destination path in Nexus repository")
@@ -86,6 +87,14 @@ func setupCommands() {
 	asset.PullCmd.Flags().StringP("destination", "d", "", "Local destination path (required)")
 	asset.PullCmd.Flags().String("root", "", "Root path in Nexus repository")
 	asset.PullCmd.Flags().BoolP("saveStructure", "s", false, "Save directory structure in destination path")
+
+	// Diff command flags
+	asset.DiffCmd.Flags().String("target-address", "", "Target Nexus OSS host address (default: source address)")
+	asset.DiffCmd.Flags().String("target-repo", "", "Target Nexus repository name")
+	asset.DiffCmd.Flags().String("target-user", "", "Target user authentication login")
+	asset.DiffCmd.Flags().String("target-pass", "", "Target user authentication password")
+	asset.DiffCmd.Flags().String("local", "", "Local directory to compare against source repository")
+	asset.DiffCmd.Flags().String("path", "", "Repository path to compare (applies to both sources)")
 
 	// Init command flags
 	initcmd.InitCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")
