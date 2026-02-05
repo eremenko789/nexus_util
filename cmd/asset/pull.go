@@ -48,6 +48,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	destination, _ := cmd.Flags().GetString("destination")
 	root, _ := cmd.Flags().GetString("root")
 	saveStructure, _ := cmd.Flags().GetBool("saveStructure")
+	excludeDirs, _ := cmd.Flags().GetStringSlice("exclude")
 
 	// Load configuration
 	cfg, err := config.LoadConfigWithFlags(configPath, map[string]interface{}{
@@ -93,7 +94,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 		if isDir {
 			// Download directory
 			client.Logf("source '%s' is directory", source)
-			if err := client.DownloadDirectoryWithPath(repository, source, destination, root, saveStructure); err != nil {
+			if err := client.DownloadDirectoryWithPath(repository, source, destination, root, saveStructure, excludeDirs); err != nil {
 				return fmt.Errorf("failed to download directory: %w", err)
 			}
 		} else {
