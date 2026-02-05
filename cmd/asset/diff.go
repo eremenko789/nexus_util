@@ -40,6 +40,10 @@ Examples:
   # Compare a repository subpath against a local directory
   nexus-util asset diff -a http://nexus.example.com -r repo1 \
     --path releases/v1.2.3 --local ./downloads
+
+  # Compare excluding a specific subdirectory
+  nexus-util asset diff -a http://nexus.example.com -r repo1 \
+    --path releases/v1.2.3 --local ./downloads --exclude releases/v1.2.3/temp
 `,
 	Args: cobra.NoArgs,
 	RunE: runDiff,
@@ -90,8 +94,20 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 	targetPass, _ := cmd.Flags().GetString("target-pass")
 	localDir, _ := cmd.Flags().GetString("local")
 	pathFlag, _ := cmd.Flags().GetString("path")
+	excludeDir, _ := cmd.Flags().GetString("exclude")
 
-	if localDir != "" && (targetAddress != "" || targetRepo != "" || targetUser != "" || targetPass != "") {
+	// Definening the work scenario
+	var scenario string
+	if localDir != "" {
+		scenario = "local"
+	} else if targetAddress != "" || targetRepo != "" {
+		scenario = "nexus-to-nexus"
+	} else {
+		return fmt.Errorf("must specify either --local or --target-* flags")
+	}
+
+	// Checking for conflicting flags
+	if scenario == "local" && (targetAddress != "" || targetRepo != "" || targetUser != "" || targetPass != "") {
 		return fmt.Errorf("use either --local or --target-* flags, not both")
 	}
 
@@ -112,6 +128,9 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 	if sourceAddress == "" {
 		return fmt.Errorf("source address is required (use --address or config)")
 	}
+	if !strings.HasPrefix(sourceAddress, "http://") && !strings.HasPrefix(sourceAddress, "https://") {
+		return fmt.Errorf("source address must include protocol (http:// or https://)")
+	}
 
 	sourceUser := username
 	if sourceUser == "" {
@@ -126,7 +145,8 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("source repository is required")
 	}
 
-	normalizedPath := normalizeRepoPath(pathFlag)
+	normalizedPath := "/" + normalizeRepoPath(pathFlag)
+	normalizedExclude := "/" + normalizeRepoPath(excludeDir)
 
 	// Always silence Nexus client logs to keep JSON clean.
 	sourceClient := nexus.NewNexusClient(sourceAddress, sourceUser, sourcePass, true, dryRun, insecure)
@@ -137,10 +157,16 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to load source repository files: %w", err)
 	}
 
+	// Applying an exclusion to source files
+	if normalizedExclude != "" {
+		sourceFiles = filterExcludedFiles(sourceFiles, normalizedExclude)
+	}
+
 	var targetFiles map[string]fileEntry
 	var targetClient *nexus.NexusClient
 
-	if localDir != "" {
+	switch scenario {
+	case "local":
 		localRoot := localDir
 		if normalizedPath != "" {
 			localRoot = filepath.Join(localDir, filepath.FromSlash(normalizedPath))
@@ -149,11 +175,14 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to load local files: %w", err)
 		}
-	} else {
-		if targetRepo == "" {
-			return fmt.Errorf("target repository is required when comparing repositories")
+
+		// Applying an exclusion to local files
+		if normalizedExclude != "" {
+			targetFiles = filterExcludedFiles(targetFiles, normalizedExclude)
 		}
 
+	case "nexus-to-nexus":
+		// Setting up the target client
 		if targetAddress == "" {
 			targetAddress = sourceAddress
 		}
@@ -161,7 +190,12 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 			targetUser = sourceUser
 		}
 		if targetPass == "" {
-			targetPass = sourcePass
+			targetPass = cfg.GetPassword()
+		}
+
+		// Check that the target repository is specified
+		if targetRepo == "" {
+			return fmt.Errorf("target repository is required when comparing repositories")
 		}
 
 		targetClient = nexus.NewNexusClient(targetAddress, targetUser, targetPass, true, dryRun, insecure)
@@ -169,6 +203,12 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to load target repository files: %w", err)
 		}
+
+		// Applying an exclusion to target files
+		if normalizedExclude != "" {
+			targetFiles = filterExcludedFiles(targetFiles, normalizedExclude)
+		}
+
 	}
 
 	result := diffResult{
@@ -396,6 +436,20 @@ func computeLocalHash(filePath string, algorithm string) (string, error) {
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func filterExcludedFiles(files map[string]fileEntry, excludePath string) map[string]fileEntry {
+	filtered := make(map[string]fileEntry)
+	excludePrefix := excludePath + "/"
+
+	for path, entry := range files {
+		if strings.HasPrefix(path, excludePrefix) {
+			continue
+		}
+		filtered[path] = entry
+	}
+
+	return filtered
 }
 
 func newLocalHashForAlgorithm(algorithm string) (hash.Hash, error) {

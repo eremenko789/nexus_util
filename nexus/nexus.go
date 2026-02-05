@@ -125,8 +125,8 @@ type SearchAssetsResponse struct {
 
 // Asset represents a file in Nexus repository
 type Asset struct {
-	Path        string `json:"path"`
-	DownloadUrl string `json:"downloadUrl"`
+	Path        string            `json:"path"`
+	DownloadUrl string            `json:"downloadUrl"`
 	Checksum    map[string]string `json:"checksum"`
 }
 

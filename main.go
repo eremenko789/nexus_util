@@ -93,6 +93,7 @@ func setupCommands() {
 	asset.DiffCmd.Flags().String("target-repo", "", "Target Nexus repository name")
 	asset.DiffCmd.Flags().String("target-user", "", "Target user authentication login")
 	asset.DiffCmd.Flags().String("target-pass", "", "Target user authentication password")
+	asset.DiffCmd.Flags().String("exclude", "", "Exclude subdir from compare")
 	asset.DiffCmd.Flags().String("local", "", "Local directory to compare against source repository")
 	asset.DiffCmd.Flags().String("path", "", "Repository path to compare (applies to both sources)")
 
@@ -116,7 +117,6 @@ func setupCommands() {
 	sync.SyncCmd.Flags().String("target-address", "", "Target Nexus OSS host address")
 	sync.SyncCmd.Flags().String("target-repo", "", "Target Nexus repository name (required)")
 	sync.SyncCmd.Flags().String("target-user", "", "Target user authentication login")
-	sync.SyncCmd.Flags().String("target-pass", "", "Target user authentication password")
 	sync.SyncCmd.Flags().Bool("skip-existing", true, "Skip files that already exist in target repository")
 	sync.SyncCmd.Flags().Bool("show-progress", true, "Show detailed progress for each file")
 
