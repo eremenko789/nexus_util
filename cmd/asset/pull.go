@@ -3,6 +3,7 @@ package asset
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"nexus-util/config"
@@ -28,7 +29,10 @@ Examples:
   nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --root custom/path file.txt
   
   # Save directory structure
-  nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --saveStructure dir/subdir1/subdir2/`,
+  nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --saveStructure dir/subdir1/subdir2/
+  
+  # Exclude directory from downloading
+  nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/ --exclude dir/tmp`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runPull,
 }
@@ -48,6 +52,17 @@ func runPull(cmd *cobra.Command, args []string) error {
 	destination, _ := cmd.Flags().GetString("destination")
 	root, _ := cmd.Flags().GetString("root")
 	saveStructure, _ := cmd.Flags().GetBool("saveStructure")
+	excludeDirs, _ := cmd.Flags().GetStringSlice("exclude")
+
+	// Validate and clean exclude directories
+	var cleanedExcludeDirs []string
+	var err error
+	if len(excludeDirs) > 0 {
+		cleanedExcludeDirs, err = validateAndCleanExcludeDirs(excludeDirs)
+		if err != nil {
+			return fmt.Errorf("error validating exclude directories: %w", err)
+		}
+	}
 
 	// Load configuration
 	cfg, err := config.LoadConfigWithFlags(configPath, map[string]interface{}{
@@ -93,7 +108,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 		if isDir {
 			// Download directory
 			client.Logf("source '%s' is directory", source)
-			if err := client.DownloadDirectoryWithPath(repository, source, destination, root, saveStructure); err != nil {
+			if err := client.DownloadDirectoryWithPath(repository, source, destination, root, saveStructure, cleanedExcludeDirs); err != nil {
 				return fmt.Errorf("failed to download directory: %w", err)
 			}
 		} else {
@@ -110,4 +125,28 @@ func runPull(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// validateAndCleanExcludeDirs validates and normalizes exclude directory paths
+func validateAndCleanExcludeDirs(excludeDirectories []string) ([]string, error) {
+	var cleanedDirectories []string
+
+	for _, excludePath := range excludeDirectories {
+		// Skip empty paths
+		if excludePath == "" {
+			continue
+		}
+
+		// Normalize the path using filepath.Clean
+		normalizedPath := filepath.Clean(excludePath)
+
+		// Ensure the path ends with a separator to properly match directories
+		if !strings.HasSuffix(normalizedPath, string(filepath.Separator)) {
+			normalizedPath += string(filepath.Separator)
+		}
+
+		cleanedDirectories = append(cleanedDirectories, normalizedPath)
+	}
+
+	return cleanedDirectories, nil
 }

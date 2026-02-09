@@ -105,6 +105,9 @@ nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downl
 # Download a directory
 nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/
 
+# Download a directory excluding subdirectories from downloading
+nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/ --exclude dir/tmp
+
 # Download with custom root path
 nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --root custom/path file.txt
 

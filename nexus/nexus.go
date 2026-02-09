@@ -458,7 +458,7 @@ func (c *NexusClient) DownloadFileWithPath(repository string, filePath string, d
 }
 
 // DownloadDirectoryWithPath downloads a directory from Nexus repository with custom destination path
-func (c *NexusClient) DownloadDirectoryWithPath(repository string, dirPath string, destination string, root string, saveStructure bool) error {
+func (c *NexusClient) DownloadDirectoryWithPath(repository string, dirPath string, destination string, root string, saveStructure bool, exclude []string) error {
 	c.Logf("Download dir %s ...", dirPath)
 
 	// Build full path if root is specified
@@ -473,6 +473,10 @@ func (c *NexusClient) DownloadDirectoryWithPath(repository string, dirPath strin
 	files, err := c.GetFilesInDirectory(repository, fullPath)
 	if err != nil {
 		return fmt.Errorf("failed to get files in directory: %w", err)
+	}
+
+	if len(exclude) != 0 {
+		files = filterFilesBySubdirs(files, exclude)
 	}
 
 	// Download each file
@@ -818,4 +822,50 @@ func (c *NexusClient) CreateBlobStore(config BlobStoreConfig) error {
 	}
 
 	return nil
+}
+
+func filterFilesBySubdirs(assets []Asset, subdirs []string) []Asset {
+	var result []Asset
+
+	for _, asset := range assets {
+		if isInAnySubdir(asset.Path, subdirs) {
+			// Skip files that should be filtered out
+			fmt.Printf("Ignoring %s due to an exclude filter\n", asset.Path)
+			continue
+		}
+
+		result = append(result, asset)
+	}
+
+	return result
+}
+
+// isInAnySubdir returns true if path is located inside any of the subdirs.
+func isInAnySubdir(path string, subdirs []string) bool {
+	for _, base := range subdirs {
+		if isUnderDir(path, base) {
+			return true
+		}
+	}
+	return false
+}
+
+// isUnderDir checks whether path is under dir (including dir itself).
+func isUnderDir(path, dir string) bool {
+	rel, err := filepath.Rel(dir, path)
+	if err != nil {
+		return false
+	}
+
+	// rel == "." means the path is exactly dir
+	if rel == "." {
+		return true
+	}
+
+	// Outside dir if it is ".." or starts with "../"
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+
+	return true
 }

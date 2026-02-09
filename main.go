@@ -87,6 +87,16 @@ func setupCommands() {
 	asset.PullCmd.Flags().StringP("destination", "d", "", "Local destination path (required)")
 	asset.PullCmd.Flags().String("root", "", "Root path in Nexus repository")
 	asset.PullCmd.Flags().BoolP("saveStructure", "s", false, "Save directory structure in destination path")
+	asset.PullCmd.Flags().StringSlice("exclude", []string{}, "Directories to exclude from download (comma-separated, e.g., /dir/ver/3/tmp,/dir/ver/3/temp)")
+
+	// Diff command flags
+	asset.DiffCmd.Flags().String("target-address", "", "Target Nexus OSS host address (default: source address)")
+	asset.DiffCmd.Flags().String("target-repo", "", "Target Nexus repository name")
+	asset.DiffCmd.Flags().String("target-user", "", "Target user authentication login")
+	asset.DiffCmd.Flags().String("target-pass", "", "Target user authentication password")
+	asset.DiffCmd.Flags().String("exclude", "", "Exclude subdir from compare")
+	asset.DiffCmd.Flags().String("local", "", "Local directory to compare against source repository")
+	asset.DiffCmd.Flags().String("path", "", "Repository path to compare (applies to both sources)")
 
 	// Diff command flags
 	asset.DiffCmd.Flags().String("target-address", "", "Target Nexus OSS host address (default: source address)")
