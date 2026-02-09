@@ -98,15 +98,6 @@ func setupCommands() {
 	asset.DiffCmd.Flags().String("local", "", "Local directory to compare against source repository")
 	asset.DiffCmd.Flags().String("path", "", "Repository path to compare (applies to both sources)")
 
-	// Diff command flags
-	asset.DiffCmd.Flags().String("target-address", "", "Target Nexus OSS host address (default: source address)")
-	asset.DiffCmd.Flags().String("target-repo", "", "Target Nexus repository name")
-	asset.DiffCmd.Flags().String("target-user", "", "Target user authentication login")
-	asset.DiffCmd.Flags().String("target-pass", "", "Target user authentication password")
-	asset.DiffCmd.Flags().String("exclude", "", "Exclude subdir from compare")
-	asset.DiffCmd.Flags().String("local", "", "Local directory to compare against source repository")
-	asset.DiffCmd.Flags().String("path", "", "Repository path to compare (applies to both sources)")
-
 	// Init command flags
 	initcmd.InitCmd.Flags().StringP("address", "a", "", "Nexus OSS host address (required)")
 	initcmd.InitCmd.Flags().StringP("user", "u", "", "User authentication login (required)")
