@@ -11,8 +11,21 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container: debian:10
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
+    - name: Set up apt (disable SSL verify, custom sources)
+      run: |
+        echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99disable-ssl-verify
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster/ buster main contrib non-free' > /etc/apt/sources.list
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster-updates/ buster-updates main contrib non-free' >> /etc/apt/sources.list
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster-security/ buster/updates main contrib non-free' >> /etc/apt/sources.list
+    - name: Install dependencies (make, wget, ca-certificates, git, gcc, libc6-dev)
+      run: apt-get update && apt-get install -y --no-install-recommends make wget ca-certificates git gcc libc6-dev
     - uses: actions/checkout@v4
+    - name: Git safe directory
+      run: git config --global --add safe.directory '*'
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -41,6 +54,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    container: debian:10
     strategy:
       matrix:
         include:
@@ -64,8 +78,20 @@ jobs:
         - goos: openbsd
           goarch: amd64
     
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
+    - name: Set up apt (disable SSL verify, custom sources)
+      run: |
+        echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99disable-ssl-verify
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster/ buster main contrib non-free' > /etc/apt/sources.list
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster-updates/ buster-updates main contrib non-free' >> /etc/apt/sources.list
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster-security/ buster/updates main contrib non-free' >> /etc/apt/sources.list
+    - name: Install dependencies (make, wget, ca-certificates, git, gcc, libc6-dev)
+      run: apt-get update && apt-get install -y --no-install-recommends make wget ca-certificates git gcc libc6-dev && rm -rf /var/lib/apt/lists/*
     - uses: actions/checkout@v4
+    - name: Git safe directory
+      run: git config --global --add safe.directory '*'
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -132,7 +158,18 @@ jobs:
   verify-build:
     needs: build
     runs-on: ubuntu-latest
+    container: debian:10
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
+    - name: Set up apt (disable SSL verify, custom sources)
+      run: |
+        echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99disable-ssl-verify
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster/ buster main contrib non-free' > /etc/apt/sources.list
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster-updates/ buster-updates main contrib non-free' >> /etc/apt/sources.list
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster-security/ buster/updates main contrib non-free' >> /etc/apt/sources.list
+    - name: Install dependencies (make, wget, ca-certificates, git, gcc, libc6-dev)
+      run: apt-get update && apt-get install -y --no-install-recommends make wget ca-certificates git gcc libc6-dev && rm -rf /var/lib/apt/lists/*
     - name: Download all artifacts
       uses: actions/download-artifact@v4
     
@@ -177,8 +214,21 @@ jobs:
     if: github.ref_type == 'tag'
     needs: [build, verify-build]
     runs-on: ubuntu-latest
+    container: debian:10
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
+    - name: Set up apt (disable SSL verify, custom sources)
+      run: |
+        echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99disable-ssl-verify
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster/ buster main contrib non-free' > /etc/apt/sources.list
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster-updates/ buster-updates main contrib non-free' >> /etc/apt/sources.list
+        echo 'deb [trusted=yes] https://nexus-proxy.redkit-lab.work/repository/apt-proxy-debian-buster-security/ buster/updates main contrib non-free' >> /etc/apt/sources.list
+    - name: Install dependencies (make, wget, ca-certificates, git, gcc, libc6-dev)
+      run: apt-get update && apt-get install -y --no-install-recommends make wget ca-certificates git gcc libc6-dev && rm -rf /var/lib/apt/lists/*
     - uses: actions/checkout@v4
+    - name: Git safe directory
+      run: git config --global --add safe.directory '*'
     
     - name: Download all artifacts
       uses: actions/download-artifact@v4
