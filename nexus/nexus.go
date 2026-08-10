@@ -30,9 +30,12 @@ const (
 	dirPerm  = 0o755
 	filePerm = 0o600
 
-	// HTTP client timeout
-	httpTimeout = 30 * time.Minute
-	// Download timeout for large files
+	// ResponseHeaderTimeout limits how long we wait for response headers.
+	// Body transfer for large assets is governed by downloadTimeout via context,
+	// not by http.Client.Timeout (a client-wide Timeout would abort mid-body
+	// and often surface as unexpected EOF).
+	responseHeaderTimeout = 60 * time.Second
+	// Download timeout for large file body transfers
 	downloadTimeout = 60 * time.Minute
 )
 
@@ -64,15 +67,21 @@ func NewNexusClient(baseURL, username, password string, quiet, dryRun, insecure 
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	baseURL = strings.TrimSuffix(baseURL, "\\")
 
-	// Create HTTP client with optional insecure TLS
-	httpClient := &http.Client{Timeout: httpTimeout}
+	transport := &http.Transport{
+		ResponseHeaderTimeout: responseHeaderTimeout,
+	}
 	if insecure {
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
 		}
-		httpClient.Transport = transport
+	}
+
+	// Timeout is intentionally 0: large downloads rely on per-request context
+	// (downloadTimeout). A non-zero Client.Timeout covers the whole body read
+	// and can truncate multi-GB transfers with unexpected EOF.
+	httpClient := &http.Client{
+		Timeout:   0,
+		Transport: transport,
 	}
 
 	return &NexusClient{
@@ -104,16 +113,13 @@ func (c *NexusClient) makeRequestWithContext(ctx context.Context, method, url st
 	if err != nil {
 		return nil, err
 	}
+	return c.do(req)
+}
 
+func (c *NexusClient) do(req *http.Request) (*http.Response, error) {
 	if c.Username != "" && c.Password != "" {
 		req.SetBasicAuth(c.Username, c.Password)
 	}
-
-	// Set Content-Type for POST/PUT requests with body
-	if body != nil && (method == "POST" || method == "PUT") {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
 	return c.HTTPClient.Do(req)
 }
 
@@ -282,37 +288,53 @@ func (c *NexusClient) DeleteDirectory(repository string, dirPath string) error {
 	return nil
 }
 
-// DownloadFileByUrl downloads a file from Nexus repository using a direct download URL
+// DownloadFileByUrl downloads a file from Nexus repository using a direct download URL.
+// The response body is streamed to disk with io.Copy to support multi-GB assets
+// without buffering the entire file in memory (io.ReadAll fails with unexpected
+// EOF / OOM for files larger than ~4 GiB).
 func (c *NexusClient) DownloadFileByUrl(downloadURL string, destPath string) error {
 	c.Logf("REST API: %s", downloadURL)
 	c.Logf("DESTINATION: %s", destPath)
 
-	fileContent, err := c.DownloadToBuffer(downloadURL)
-	if err != nil {
-		return fmt.Errorf("failed to download file: %w", err)
-	}
-
-	// Create destination directory if it doesn't exist
 	if c.DryRun {
 		c.Logf("Directory '%s' planned for creation", filepath.Dir(destPath))
-	} else if err := os.MkdirAll(filepath.Dir(destPath), dirPerm); err != nil {
+		c.Logf("Dry run: Would download file from %s to %s", downloadURL, destPath)
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(destPath), dirPerm); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
-	// Create destination file
+	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+	defer cancel()
+
+	resp, err := c.makeRequestWithContext(ctx, "GET", downloadURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != httpStatusOK {
+		return fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+
 	file, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
 	defer file.Close()
 
-	// Write fileContent ([]byte) to file
-	_, err = file.Write(fileContent)
+	written, err := io.Copy(file, resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to write file content: %w", err)
 	}
 
-	c.Logf("Success file download...")
+	if resp.ContentLength >= 0 && written != resp.ContentLength {
+		return fmt.Errorf("incomplete download: got %d bytes, expected %d", written, resp.ContentLength)
+	}
+
+	c.Logf("Success file download (%d bytes)...", written)
 	return nil
 }
 
@@ -359,7 +381,8 @@ func (c *NexusClient) DownloadFile(repository string, filePath string, destPath 
 	return c.DownloadFileByUrl(downloadURL, destPath)
 }
 
-// UploadFile uploads a file to Nexus repository
+// UploadFile uploads a file to Nexus repository.
+// The file is streamed from disk; the whole content is not loaded into memory.
 func (c *NexusClient) UploadFile(repository string, filePath string, destPath string) error {
 	fileURL := c.repositoryURL(repository, destPath)
 
@@ -370,19 +393,30 @@ func (c *NexusClient) UploadFile(repository string, filePath string, destPath st
 
 	c.Logf("File '%s' will be pushed as %s...", filePath, fileURL)
 
-	// Read file content
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
-	fileContent, err := io.ReadAll(file)
+	stat, err := file.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+		return fmt.Errorf("failed to stat file: %w", err)
 	}
 
-	resp, err := c.makeRequest("PUT", fileURL, bytes.NewReader(fileContent))
+	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", fileURL, file)
+	if err != nil {
+		return fmt.Errorf("failed to create upload request: %w", err)
+	}
+	req.ContentLength = stat.Size()
+	req.GetBody = func() (io.ReadCloser, error) {
+		return os.Open(filePath)
+	}
+
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
 	}
@@ -672,18 +706,24 @@ func (c *NexusClient) UploadFromBuffer(repository string, destPath string, conte
 	return nil
 }
 
-// TransferFile transfers a file between two Nexus servers
+// TransferFile transfers a file between two Nexus servers.
+// Large assets are streamed through a temporary file instead of RAM.
 func (c *NexusClient) TransferFile(target *NexusClient, sourceRepo string, targetRepo string, fileAsset Asset, skipIfExists bool) error {
-	// Download from source
-	c.Logf("Downloading '%s' from %s...", fileAsset.Path, c.BaseURL)
-	content, err := c.DownloadToBuffer(fileAsset.DownloadUrl)
+	tmpFile, err := os.CreateTemp("", "nexus-transfer-*")
 	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	_ = tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	c.Logf("Downloading '%s' from %s...", fileAsset.Path, c.BaseURL)
+	if err := c.DownloadFileByUrl(fileAsset.DownloadUrl, tmpPath); err != nil {
 		return fmt.Errorf("failed to download file: %w", err)
 	}
 
-	// Upload to target
 	c.Logf("Uploading '%s' to %s...", fileAsset.Path, target.BaseURL)
-	if err := target.UploadFromBuffer(targetRepo, fileAsset.Path, content); err != nil {
+	if err := target.UploadFile(targetRepo, tmpPath, fileAsset.Path); err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
 	}
 
@@ -807,7 +847,13 @@ func (c *NexusClient) CreateBlobStore(config BlobStoreConfig) error {
 
 	c.Logf("Creating blob store '%s' of type '%s'...", config.Name, config.Type)
 
-	resp, err := c.makeRequest("POST", blobStoreURL, bytes.NewReader(requestBody))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", blobStoreURL, bytes.NewReader(requestBody))
+	if err != nil {
+		return fmt.Errorf("failed to create blob store request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("failed to create blob store: %w", err)
 	}
