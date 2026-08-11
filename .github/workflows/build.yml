@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: debian:buster
     steps:
     - uses: actions/checkout@v4
     
@@ -40,7 +40,7 @@ jobs:
 
   build:
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: debian:buster
     strategy:
       matrix:
         include:
@@ -131,7 +131,7 @@ jobs:
 
   verify-build:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: debian:buster
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
@@ -176,7 +176,7 @@ jobs:
   release:
     if: github.ref_type == 'tag'
     needs: [build, verify-build]
-    runs-on: ubuntu-latest
+    runs-on: debian:buster
     steps:
     - uses: actions/checkout@v4
     
