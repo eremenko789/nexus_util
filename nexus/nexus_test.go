@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNexusClientCreation(t *testing.T) {
@@ -123,6 +124,19 @@ func TestNexusClientHasNoOverallHTTPTimeout(t *testing.T) {
 	if client.HTTPClient.Timeout != 0 {
 		t.Fatalf("Expected HTTPClient.Timeout=0 for large downloads, got %v", client.HTTPClient.Timeout)
 	}
+	transport, ok := client.HTTPClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("Expected *http.Transport, got %T", client.HTTPClient.Transport)
+	}
+	if transport.ResponseHeaderTimeout != responseHeaderTimeout {
+		t.Fatalf("Expected ResponseHeaderTimeout=%v for uploads, got %v", responseHeaderTimeout, transport.ResponseHeaderTimeout)
+	}
+	if responseHeaderTimeout < 30*time.Minute {
+		t.Fatalf("ResponseHeaderTimeout too short for asset push: %v", responseHeaderTimeout)
+	}
+	if uploadTimeout < 30*time.Minute {
+		t.Fatalf("uploadTimeout too short for asset push: %v", uploadTimeout)
+	}
 }
 
 func TestDownloadFileByUrlStreamsToDisk(t *testing.T) {
@@ -215,6 +229,80 @@ func TestUploadFileStreamsFromDisk(t *testing.T) {
 	client := NewNexusClient(server.URL, "testuser", "testpass", true, false, false)
 	if err := client.UploadFile("raw", srcPath, "path/to/asset.bin"); err != nil {
 		t.Fatalf("UploadFile failed: %v", err)
+	}
+	if string(gotBody) != payload {
+		t.Fatalf("uploaded content mismatch: got %q want %q", gotBody, payload)
+	}
+}
+
+func TestUploadFileAllowsSlowResponseHeaders(t *testing.T) {
+	// Simulates Nexus taking a while after receiving the body before sending
+	// response headers. A short ResponseHeaderTimeout aborts otherwise-successful PUTs.
+	const payload = "slow-header-upload"
+	const headerDelay = 1500 * time.Millisecond
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read upload body: %v", err)
+			return
+		}
+		if string(body) != payload {
+			t.Errorf("unexpected body: %q", body)
+		}
+		time.Sleep(headerDelay)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	srcPath := filepath.Join(t.TempDir(), "slow.bin")
+	if err := os.WriteFile(srcPath, []byte(payload), 0o600); err != nil {
+		t.Fatalf("failed to write source file: %v", err)
+	}
+
+	if responseHeaderTimeout < 30*time.Minute {
+		t.Fatalf("production ResponseHeaderTimeout too short for asset push: %v", responseHeaderTimeout)
+	}
+	if uploadTimeout < 30*time.Minute {
+		t.Fatalf("production uploadTimeout too short for asset push: %v", uploadTimeout)
+	}
+
+	shortClient := NewNexusClient(server.URL, "testuser", "testpass", true, false, false)
+	shortTransport := shortClient.HTTPClient.Transport.(*http.Transport).Clone()
+	shortTransport.ResponseHeaderTimeout = 200 * time.Millisecond
+	shortClient.HTTPClient.Transport = shortTransport
+	if err := shortClient.UploadFile("raw", srcPath, "path/to/slow.bin"); err == nil {
+		t.Fatal("expected upload to fail with short ResponseHeaderTimeout")
+	}
+
+	okClient := NewNexusClient(server.URL, "testuser", "testpass", true, false, false)
+	okTransport := okClient.HTTPClient.Transport.(*http.Transport).Clone()
+	okTransport.ResponseHeaderTimeout = 5 * time.Second
+	okClient.HTTPClient.Transport = okTransport
+	if err := okClient.UploadFile("raw", srcPath, "path/to/slow.bin"); err != nil {
+		t.Fatalf("UploadFile should wait for slow response headers: %v", err)
+	}
+}
+
+func TestUploadFromBufferUsesUploadTimeout(t *testing.T) {
+	const payload = "buffer-upload-payload"
+	var gotBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("expected PUT, got %s", r.Method)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read upload body: %v", err)
+		}
+		gotBody = body
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	client := NewNexusClient(server.URL, "testuser", "testpass", true, false, false)
+	if err := client.UploadFromBuffer("raw", "path/to/buffer.bin", []byte(payload)); err != nil {
+		t.Fatalf("UploadFromBuffer failed: %v", err)
 	}
 	if string(gotBody) != payload {
 		t.Fatalf("uploaded content mismatch: got %q want %q", gotBody, payload)

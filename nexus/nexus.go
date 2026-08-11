@@ -30,13 +30,19 @@ const (
 	dirPerm  = 0o755
 	filePerm = 0o600
 
-	// ResponseHeaderTimeout limits how long we wait for response headers.
-	// Body transfer for large assets is governed by downloadTimeout via context,
-	// not by http.Client.Timeout (a client-wide Timeout would abort mid-body
-	// and often surface as unexpected EOF).
-	responseHeaderTimeout = 60 * time.Second
+	// ResponseHeaderTimeout is how long to wait for response headers after the
+	// request (including body) has been fully written. For asset uploads Nexus
+	// may spend a long time hashing/storing the payload before sending headers;
+	// a short value here aborts otherwise-successful PUTs (net/http timeout
+	// awaiting response headers). Body transfer itself is governed by
+	// downloadTimeout / uploadTimeout via per-request context — not by
+	// http.Client.Timeout (a client-wide Timeout would abort mid-body and often
+	// surface as unexpected EOF).
+	responseHeaderTimeout = 60 * time.Minute
 	// Download timeout for large file body transfers
 	downloadTimeout = 60 * time.Minute
+	// Upload timeout for large file body transfers + server-side processing
+	uploadTimeout = 60 * time.Minute
 )
 
 // NexusClient represents a client for Nexus OSS API
@@ -61,27 +67,36 @@ func (c *NexusClient) repositoryURL(repository, assetPath string) string {
 	return fmt.Sprintf("%s/repository/%s/%s", c.BaseURL, repository, encodedPath)
 }
 
+// newHTTPTransport builds an HTTP transport that keeps DefaultTransport
+// defaults (proxy, dialer, HTTP/2) while applying transfer timeouts.
+func newHTTPTransport(insecure bool) *http.Transport {
+	var transport *http.Transport
+	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport = dt.Clone()
+	} else {
+		transport = &http.Transport{}
+	}
+	transport.ResponseHeaderTimeout = responseHeaderTimeout
+	if insecure {
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+	return transport
+}
+
 // NewNexusClient creates a new Nexus client
 func NewNexusClient(baseURL, username, password string, quiet, dryRun, insecure bool) *NexusClient {
 	// Remove trailing slash from baseURL
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	baseURL = strings.TrimSuffix(baseURL, "\\")
 
-	transport := &http.Transport{
-		ResponseHeaderTimeout: responseHeaderTimeout,
-	}
-	if insecure {
-		transport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true,
-		}
-	}
-
-	// Timeout is intentionally 0: large downloads rely on per-request context
-	// (downloadTimeout). A non-zero Client.Timeout covers the whole body read
-	// and can truncate multi-GB transfers with unexpected EOF.
+	// Timeout is intentionally 0: large transfers rely on per-request context
+	// (downloadTimeout / uploadTimeout). A non-zero Client.Timeout covers the
+	// whole body read/write and can truncate multi-GB transfers with unexpected EOF.
 	httpClient := &http.Client{
 		Timeout:   0,
-		Transport: transport,
+		Transport: newHTTPTransport(insecure),
 	}
 
 	return &NexusClient{
@@ -404,7 +419,7 @@ func (c *NexusClient) UploadFile(repository string, filePath string, destPath st
 		return fmt.Errorf("failed to stat file: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), uploadTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "PUT", fileURL, file)
@@ -691,7 +706,10 @@ func (c *NexusClient) UploadFromBuffer(repository string, destPath string, conte
 
 	c.Logf("Uploading from buffer to %s...", fileURL)
 
-	resp, err := c.makeRequest("PUT", fileURL, bytes.NewReader(content))
+	ctx, cancel := context.WithTimeout(context.Background(), uploadTimeout)
+	defer cancel()
+
+	resp, err := c.makeRequestWithContext(ctx, "PUT", fileURL, bytes.NewReader(content))
 	if err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
 	}
