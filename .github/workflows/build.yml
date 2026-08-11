@@ -13,30 +13,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
         cache: true
-    
+
     - name: Install dependencies
       run: |
         echo "Installing Go dependencies..."
         go mod download
         go mod tidy
-    
+
     - name: Run tests
+      env:
+        CGO_ENABLED: 0
       run: |
         echo "Running tests..."
         go test -cover -v ./...
-    
+
     - name: Run linter
       uses: golangci/golangci-lint-action@v3
       continue-on-error: true
       with:
         version: latest
-        args: --timeout=5m 
+        args: --timeout=5m
 
   build:
     needs: test
@@ -63,56 +65,59 @@ jobs:
           goarch: amd64
         - goos: openbsd
           goarch: amd64
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
         cache: true
-    
+
     - name: Install dependencies
       run: |
         echo "Installing Go dependencies..."
         go mod download
         go mod tidy
-    
+
     - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
       env:
+        CGO_ENABLED: 0
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
         GOARM: ${{ matrix.goarm }}
       run: |
         echo "Starting build for ${{ matrix.goos }}/${{ matrix.goarch }}..."
-        
+
         # Get version info safely
         if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
           VERSION=$(git describe --tags --exact-match HEAD)
         else
           VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
         fi
-        
+
         BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
         GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-        
+
         OUTPUT_NAME=nexus-util
         if [ "${{ matrix.goos }}" = "windows" ]; then
           OUTPUT_NAME=nexus-util.exe
         fi
-        
+
         echo "Build configuration:"
         echo "  Version: $VERSION"
         echo "  Build time: $BUILD_TIME"
         echo "  Git commit: $GIT_COMMIT"
         echo "  Target: ${{ matrix.goos }}/${{ matrix.goarch }}"
         echo "  Output: $OUTPUT_NAME"
-        
-        # Build the binary
-        go build -ldflags "-X main.version=$VERSION -X main.build=$GIT_COMMIT" \
+        echo "  CGO_ENABLED: $CGO_ENABLED"
+
+        # Build the binary (pure-Go, no glibc)
+        go build -tags 'netgo osusergo' -trimpath \
+          -ldflags "-s -w -X main.version=$VERSION -X main.build=$GIT_COMMIT" \
           -o $OUTPUT_NAME .
-        
+
         # Verify the binary was created
         if [ -f "$OUTPUT_NAME" ]; then
           echo "✅ Binary created successfully: $OUTPUT_NAME"
@@ -121,7 +126,7 @@ jobs:
           echo "❌ Binary creation failed!"
           exit 1
         fi
-    
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
@@ -135,15 +140,15 @@ jobs:
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
-    
+
     - name: Verify all binaries were built
       run: |
         echo "Verifying all binaries were built successfully..."
-        
+
         # Expected platforms and architectures
         expected_platforms=(
           "linux-amd64"
-          "linux-arm64" 
+          "linux-arm64"
           "linux-arm7"
           "windows-amd64"
           "windows-386"
@@ -152,7 +157,7 @@ jobs:
           "freebsd-amd64"
           "openbsd-amd64"
         )
-        
+
         # Check if all expected artifacts exist
         missing_artifacts=()
         for platform in "${expected_platforms[@]}"; do
@@ -163,7 +168,7 @@ jobs:
             ls -la "nexus-util-$platform/"
           fi
         done
-        
+
         # Report results
         if [ ${#missing_artifacts[@]} -eq 0 ]; then
           echo "🎉 All binaries built successfully!"
@@ -179,10 +184,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Download all artifacts
       uses: actions/download-artifact@v4
-    
+
     - name: Create release packages
       run: |
         mkdir -p release
@@ -199,14 +204,14 @@ jobs:
             rm -rf release/$PACKAGE_NAME
           fi
         done
-    
+
     - name: Create checksums
       run: |
         cd release
         sha256sum *.tar.gz > checksums.txt
         echo "Created checksums:"
         cat checksums.txt
-    
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:

@@ -8,8 +8,13 @@ VERSION ?= 1.0.0
 BUILD_TIME = $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
+# Pure-Go build (no glibc / CGO)
+export CGO_ENABLED = 0
+GO_TAGS = netgo osusergo
+
 # Build flags
-LDFLAGS = -ldflags "-X main.version=$(VERSION) -X main.build=$(GIT_COMMIT)"
+GO_BUILD_FLAGS = -tags "$(GO_TAGS)" -trimpath
+LDFLAGS = -ldflags "-s -w -X main.version=$(VERSION) -X main.build=$(GIT_COMMIT)"
 
 # Supported platforms and architectures
 PLATFORMS = linux/amd64 linux/arm64 linux/arm linux/386 \
@@ -27,7 +32,7 @@ all: clean build
 .PHONY: build
 build:
 	@echo "Building $(APP_NAME) for current platform..."
-	go build $(LDFLAGS) -o bin/$(APP_NAME) .
+	go build $(GO_BUILD_FLAGS) $(LDFLAGS) -o bin/$(APP_NAME) .
 
 # Build for all platforms
 .PHONY: build-all
@@ -40,7 +45,7 @@ build-all: clean
 		OUTPUT_NAME=$(APP_NAME); \
 		if [ "$$OS" = "windows" ]; then OUTPUT_NAME=$(APP_NAME).exe; fi; \
 		echo "Building for $$OS/$$ARCH..."; \
-		GOOS=$$OS GOARCH=$$ARCH go build $(LDFLAGS) -o bin/$(APP_NAME)-$$OS-$$ARCH$$(if [ "$$OS" = "windows" ]; then echo .exe; fi) .; \
+		GOOS=$$OS GOARCH=$$ARCH go build $(GO_BUILD_FLAGS) $(LDFLAGS) -o bin/$(APP_NAME)-$$OS-$$ARCH$$(if [ "$$OS" = "windows" ]; then echo .exe; fi) .; \
 	done
 	@echo "Build completed! Binaries are in bin/ directory"
 
@@ -49,25 +54,25 @@ build-all: clean
 build-linux-amd64:
 	@echo "Building for linux/amd64..."
 	@mkdir -p bin
-	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/$(APP_NAME)-linux-amd64 .
+	GOOS=linux GOARCH=amd64 go build $(GO_BUILD_FLAGS) $(LDFLAGS) -o bin/$(APP_NAME)-linux-amd64 .
 
 .PHONY: build-windows-amd64
 build-windows-amd64:
 	@echo "Building for windows/amd64..."
 	@mkdir -p bin
-	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o bin/$(APP_NAME)-windows-amd64.exe .
+	GOOS=windows GOARCH=amd64 go build $(GO_BUILD_FLAGS) $(LDFLAGS) -o bin/$(APP_NAME)-windows-amd64.exe .
 
 .PHONY: build-darwin-amd64
 build-darwin-amd64:
 	@echo "Building for darwin/amd64..."
 	@mkdir -p bin
-	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o bin/$(APP_NAME)-darwin-amd64 .
+	GOOS=darwin GOARCH=amd64 go build $(GO_BUILD_FLAGS) $(LDFLAGS) -o bin/$(APP_NAME)-darwin-amd64 .
 
 .PHONY: build-darwin-arm64
 build-darwin-arm64:
 	@echo "Building for darwin/arm64..."
 	@mkdir -p bin
-	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o bin/$(APP_NAME)-darwin-arm64 .
+	GOOS=darwin GOARCH=arm64 go build $(GO_BUILD_FLAGS) $(LDFLAGS) -o bin/$(APP_NAME)-darwin-arm64 .
 
 # Test
 .PHONY: test
