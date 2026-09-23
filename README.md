@@ -20,13 +20,13 @@ A unified command-line tool for managing files and directories in Nexus OSS Raw 
 
 ### Pre-built binaries
 
-Download the latest release for your platform from the [Releases](https://github.com/your-username/nexus-util/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/eremenko789/nexus_util/releases) page.
 
 ### From source
 
 ```bash
-git clone https://github.com/your-username/nexus-util.git
-cd nexus-util
+git clone https://github.com/eremenko789/nexus_util.git
+cd nexus_util
 make build
 ```
 
@@ -48,12 +48,13 @@ The tool supports configuration via a YAML file to avoid specifying connection d
 
 **Example configuration file:**
 ```yaml
-nexus:
-  address: http://nexus.example.com
-repository: myrepo
+nexusAddress: http://nexus.example.com
 user: myuser
-password: mypassword
+password: mypass
 ```
+
+The keys are flat. A nested block such as `nexus: {address: ...}` is **not** read —
+`nexus-util init` writes the format above and is the source of truth.
 
 **Initialize configuration:**
 ```bash
@@ -75,19 +76,19 @@ Upload files or directories to Nexus repository.
 
 ```bash
 # Upload a single file
-nexus-util push -a http://nexus.example.com -r myrepo -u user -p pass file.txt
+nexus-util asset push -a http://nexus.example.com -r myrepo -u user -p pass file.txt
 
 # Upload a directory
-nexus-util push -a http://nexus.example.com -r myrepo -u user -p pass ./localdir/
+nexus-util asset push -a http://nexus.example.com -r myrepo -u user -p pass ./localdir/
 
 # Upload with custom destination path
-nexus-util push -a http://nexus.example.com -r myrepo -u user -p pass -d custom/path file.txt
+nexus-util asset push -a http://nexus.example.com -r myrepo -u user -p pass -d custom/path file.txt
 
 # Upload directory with relative paths
-nexus-util push -a http://nexus.example.com -r myrepo -u user -p pass --relative ./localdir/
+nexus-util asset push -a http://nexus.example.com -r myrepo -u user -p pass --relative ./localdir/
 
 # Dry run to see what would be uploaded
-nexus-util push --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt
+nexus-util asset push --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt
 ```
 
 **Push-specific flags:**
@@ -100,19 +101,19 @@ Download files or directories from Nexus repository.
 
 ```bash
 # Download a single file
-nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads file.txt
+nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads file.txt
 
 # Download a directory
-nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/
+nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/
 
 # Download a directory excluding subdirectories from downloading
-nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/ --exclude dir/tmp
+nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads dir/ --exclude dir/tmp
 
 # Download with custom root path
-nexus-util pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --root custom/path file.txt
+nexus-util asset pull -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads --root custom/path file.txt
 
 # Dry run to see what would be downloaded
-nexus-util pull --dry -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads file.txt
+nexus-util asset pull --dry -a http://nexus.example.com -r myrepo -u user -p pass -d ./downloads file.txt
 ```
 
 **Pull-specific flags:**
@@ -125,13 +126,13 @@ Delete files or directories from Nexus repository.
 
 ```bash
 # Delete a single file
-nexus-util delete -a http://nexus.example.com -r myrepo -u user -p pass file.txt
+nexus-util asset delete -a http://nexus.example.com -r myrepo -u user -p pass file.txt
 
 # Delete a directory
-nexus-util delete -a http://nexus.example.com -r myrepo -u user -p pass dir/
+nexus-util asset delete -a http://nexus.example.com -r myrepo -u user -p pass dir/
 
 # Dry run to see what would be deleted
-nexus-util delete --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt
+nexus-util asset delete --dry -a http://nexus.example.com -r myrepo -u user -p pass file.txt
 ```
 
 ### Sync Command
@@ -215,21 +216,23 @@ Initialize configuration file with default values.
 
 ```bash
 # Initialize with default config file location (~/.nexus-util.yaml)
-nexus-util init --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+nexus-util init --address http://nexus.example.com --user myuser --password mypass
 
 # Initialize with custom config file location
-nexus-util init --config ./my-config.yaml --address http://nexus.example.com --repository myrepo --user myuser --password mypass
+nexus-util init --config ./my-config.yaml --address http://nexus.example.com --user myuser --password mypass
 
 # Initialize without password (will be prompted)
-nexus-util init --address http://nexus.example.com --repository myrepo --user myuser
+nexus-util init --address http://nexus.example.com --user myuser
 ```
 
 **Init-specific flags:**
 - `-a, --address`: Nexus OSS host address (required)
-- `-r, --repository`: Nexus OSS raw repository name (required)
 - `-u, --user`: User authentication login (required)
 - `-p, --password`: User authentication password
 - `-c, --config`: Path to configuration file (default: ~/.nexus-util.yaml)
+
+Note: `init` has no `--repository` flag — the repository is selected per command with
+`-r/--repository` on `nexus-util asset ...`.
 
 ## Examples
 
@@ -240,48 +243,48 @@ nexus-util init --address http://nexus.example.com --repository myrepo --user my
 nexus-util init --address http://nexus.example.com --repository releases --user deploy --password secret
 
 # Now you can use commands without specifying connection details
-nexus-util push file.txt
-nexus-util pull -d ./downloads file.txt
-nexus-util delete file.txt
+nexus-util asset push file.txt
+nexus-util asset pull -d ./downloads file.txt
+nexus-util asset delete file.txt
 ```
 
 ### Upload a project to Nexus
 
 ```bash
 # Using configuration file
-nexus-util push -d myproject/v1.0.0 ./build/
+nexus-util asset push -d myproject/v1.0.0 ./build/
 
 # Override repository from config
-nexus-util push -r staging -d myproject/v1.0.0 ./build/
+nexus-util asset push -r staging -d myproject/v1.0.0 ./build/
 
 # Upload with relative paths (only files, not directory structure)
-nexus-util push --relative ./dist/
+nexus-util asset push --relative ./dist/
 ```
 
 ### Download a release
 
 ```bash
 # Using configuration file
-nexus-util pull -d ./downloads myproject/v1.0.0/
+nexus-util asset pull -d ./downloads myproject/v1.0.0/
 
 # Override destination repository
-nexus-util pull -r staging -d ./downloads myproject/v1.0.0/
+nexus-util asset pull -r staging -d ./downloads myproject/v1.0.0/
 
 # Download latest files
-nexus-util pull -d ./downloads latest/
+nexus-util asset pull -d ./downloads latest/
 ```
 
 ### Clean up old releases
 
 ```bash
 # Using configuration file
-nexus-util delete myproject/v0.9.0/
+nexus-util asset delete myproject/v0.9.0/
 
 # Override user for admin operations
-nexus-util delete -u admin -p adminpass myproject/v0.9.0/
+nexus-util asset delete -u admin -p adminpass myproject/v0.9.0/
 
 # Dry run to see what would be deleted
-nexus-util delete --dry old-files/
+nexus-util asset delete --dry old-files/
 ```
 
 ### Sync between servers
@@ -305,55 +308,77 @@ nexus-util sync --source-repo releases \
 
 ```bash
 # Use different config for different environments
-nexus-util --config ./prod-config.yaml push file.txt
-nexus-util --config ./staging-config.yaml pull -d ./downloads file.txt
+nexus-util --config ./prod-config.yaml asset push file.txt
+nexus-util --config ./staging-config.yaml asset pull -d ./downloads file.txt
 ```
 
 ## Development
 
 ### Prerequisites
 
-- Go 1.21 or later
-- Make (optional, for using Makefile)
+- Go, at the version declared in `go.mod` (`go 1.21`)
+- `make` — every developer command runs through the Makefile
+- Optional: a C toolchain for `make test-race`; Docker + private-registry access for
+  `make run-container`
+
+### Setup
+
+```bash
+# Download dependencies and install the pinned golangci-lint into .artifacts/bin
+make bootstrap
+
+# List every available target
+make help
+```
 
 ### Building
 
 ```bash
-# Install dependencies
-make deps
-
-# Build for current platform
+# Build for current platform (output: bin/nexus-util)
 make build
 
-# Build for all platforms
+# Build for all platforms / a specific platform
 make build-all
-
-# Build for specific platform
 make build-linux-amd64
-make build-windows-amd64
-make build-darwin-amd64
 make build-darwin-arm64
 ```
 
-### Testing
+### Verifying a change
+
+`make verify` runs the same gate as CI (fmt-check, vet, lint, test, build,
+generate-check):
 
 ```bash
-# Run tests
+make fmt          # format in place
+make fmt-check    # fail if anything is unformatted
+make lint         # lint only what changed since origin/main
+make lint-full    # lint the whole repository (includes known legacy findings)
+make vet
 make test
+make test-race
+make test-cover   # writes .artifacts/coverage.out and prints the total
+make vulncheck    # govulncheck (needs network access to vuln.go.dev)
+make verify       # everything CI enforces
+```
 
-# Run linter
-make lint
+Run a single test or package while iterating:
 
-# Format code
-make fmt
+```bash
+go test -run TestUploadFile ./nexus
+make test GO_TEST_FLAGS='-count=1 -v'
 ```
 
 ### Creating releases
 
 ```bash
-# Create release packages
+# Create local release packages (never pushes or publishes anything)
 make release
 ```
+
+### For coding agents
+
+`AGENTS.md` is the entry point for autonomous coding agents: repository map,
+exact commands, Go conventions, security constraints and the definition of done.
 
 ## Migration from Python scripts
 
@@ -361,17 +386,17 @@ This Go application provides the same functionality as the original Python scrip
 
 | Python Script | Go Command | Notes |
 |---------------|------------|-------|
-| `nexus_push.py` | `nexus-util push` | Same functionality, improved error handling |
-| `nexus_pull.py` | `nexus-util pull` | Same functionality, better progress reporting |
-| `nexus_delete.py` | `nexus-util delete` | Same functionality, more robust file discovery |
+| `nexus_push.py` | `nexus-util asset push` | Same functionality, improved error handling |
+| `nexus_pull.py` | `nexus-util asset pull` | Same functionality, better progress reporting |
+| `nexus_delete.py` | `nexus-util asset delete` | Same functionality, more robust file discovery |
 
 ### Command mapping
 
 | Python | Go |
 |--------|----|
-| `python nexus_push.py -a ADDR -r REPO -u USER -p PASS file.txt` | `nexus-util push -a ADDR -r REPO -u USER -p PASS file.txt` |
-| `python nexus_pull.py -a ADDR -r REPO -u USER -p PASS -d DEST file.txt` | `nexus-util pull -a ADDR -r REPO -u USER -p PASS -d DEST file.txt` |
-| `python nexus_delete.py -a ADDR -r REPO -u USER -p PASS file.txt` | `nexus-util delete -a ADDR -r REPO -u USER -p PASS file.txt` |
+| `python nexus_push.py -a ADDR -r REPO -u USER -p PASS file.txt` | `nexus-util asset push -a ADDR -r REPO -u USER -p PASS file.txt` |
+| `python nexus_pull.py -a ADDR -r REPO -u USER -p PASS -d DEST file.txt` | `nexus-util asset pull -a ADDR -r REPO -u USER -p PASS -d DEST file.txt` |
+| `python nexus_delete.py -a ADDR -r REPO -u USER -p PASS file.txt` | `nexus-util asset delete -a ADDR -r REPO -u USER -p PASS file.txt` |
 
 ## Supported Platforms
 

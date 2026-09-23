@@ -1,5 +1,8 @@
-nexus:
-    address: http://nexus.example.com
-repository: testrepo
+# Sample configuration for local testing.
+#
+# Keys are flat and must match config.Config (nexusAddress/user/password).
+# A nested "nexus: {address: ...}" block is NOT read — viper unmarshals into flat
+# keys only. Generate a real file with: nexus-util init --address ... --user ...
+nexusAddress: http://nexus.example.com
 user: testuser
 password: testpass

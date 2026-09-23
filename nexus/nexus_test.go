@@ -116,7 +116,6 @@ func TestRepositoryURLWithSpaces(t *testing.T) {
 	if got != expected {
 		t.Fatalf("Expected repository URL '%s', got '%s'", expected, got)
 	}
-
 }
 
 func TestNexusClientHasNoOverallHTTPTimeout(t *testing.T) {

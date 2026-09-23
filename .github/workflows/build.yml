@@ -9,39 +9,34 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  # Single entry point for the checks a developer runs locally. It calls the same
+  # Makefile targets documented in AGENTS.md so CI and local verification cannot
+  # drift apart. `make verify` = fmt-check + vet + lint + test + build +
+  # generate-check. Deliberately not distributed into separate steps: a local
+  # `make verify` must be exactly what CI enforces.
+  verify:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        # Full history so `make lint` can diff against the merge base with
+        # origin/main (golangci-lint --new-from-rev).
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version-file: go.mod
         cache: true
 
-    - name: Install dependencies
-      run: |
-        echo "Installing Go dependencies..."
-        go mod download
-        go mod tidy
+    - name: Bootstrap (dependencies + pinned tools)
+      run: make bootstrap
 
-    - name: Run tests
-      env:
-        CGO_ENABLED: 0
-      run: |
-        echo "Running tests..."
-        go test -cover -v ./...
-
-    - name: Run linter
-      uses: golangci/golangci-lint-action@v3
-      continue-on-error: true
-      with:
-        version: latest
-        args: --timeout=5m
+    - name: Verify
+      run: make verify
 
   build:
-    needs: test
+    needs: verify
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -72,14 +67,13 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version-file: go.mod
         cache: true
 
     - name: Install dependencies
       run: |
         echo "Installing Go dependencies..."
         go mod download
-        go mod tidy
 
     - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
       env:

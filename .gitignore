@@ -23,6 +23,9 @@ go.work
 bin/
 release/
 
+# Local tooling and coverage output produced by the Makefile
+.artifacts/
+
 # IDE files
 .vscode/
 .idea/

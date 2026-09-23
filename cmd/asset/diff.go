@@ -208,7 +208,6 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 		if normalizedExclude != "" {
 			targetFiles = filterExcludedFiles(targetFiles, normalizedExclude)
 		}
-
 	}
 
 	result := diffResult{

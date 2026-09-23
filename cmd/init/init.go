@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"nexus-util/config"
+
 	"github.com/spf13/cobra"
 )
 
@@ -84,4 +85,3 @@ func readPassword() (string, error) {
 	_, err := fmt.Scanln(&password)
 	return password, err
 }
-

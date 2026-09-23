@@ -9,4 +9,3 @@ var AssetCmd = &cobra.Command{
 	Short: "Asset management commands",
 	Long:  "Commands for managing assets (files and directories) in Nexus repository",
 }
-
