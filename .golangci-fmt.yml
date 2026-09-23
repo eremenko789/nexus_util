@@ -1,0 +1,27 @@
+# Formatting-only golangci-lint configuration, used by `make fmt` and
+# `make fmt-check`.
+#
+# It exists as a separate file because golangci-lint merges the `linters.enable`
+# list from .golangci.yml with command line flags, so `--disable-all` cannot
+# narrow the full configuration down to the formatters. Keeping the formatting
+# rules here makes `make fmt` format-only and lets it exit 0 on a formatted tree.
+#
+# The gofmt/goimports/whitespace settings below must stay identical to the
+# corresponding entries in .golangci.yml, otherwise `make fmt` and `make lint`
+# can disagree about what "formatted" means.
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: nexus-util
+
+linters:
+  disable-all: true
+  enable:
+    - gofmt
+    - goimports
+    - whitespace
